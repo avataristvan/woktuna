@@ -1,7 +1,19 @@
-import type { Scale } from '../domain/scale'
-import type { NearestTarget } from '../domain/nearest-target'
-import { nearestTarget } from '../domain/nearest-target'
 import type { NoteName } from '../domain/note'
+import { frequencyToNote, noteToFrequency } from '../domain/note'
+
+export interface ResolvedTarget {
+  note: NoteName
+  targetHz: number
+  centDeviation: number
+}
+
+// Deliberately re-implemented here rather than imported from `note.ts`
+// (which doesn't export it) — keeps this application-layer file's cents
+// math local rather than growing a shared-but-private dependency between
+// an application-layer file and a domain-layer one.
+function centsBetween(a: number, b: number): number {
+  return 1200 * Math.log2(a / b)
+}
 
 // 440Hz is an UNVERIFIED PLACEHOLDER default reference pitch, per plan Open
 // Item #1 — this repo has no confirmed source for what reference pitch real
@@ -10,16 +22,6 @@ import type { NoteName } from '../domain/note'
 // `setReferencePitchHz` below) that lets the user change it at any time, so
 // it must never be hardened into a fixed, unconfigurable constant.
 const UNVERIFIED_DEFAULT_REFERENCE_PITCH_HZ = 440
-
-// Deliberately re-implemented here rather than imported from
-// `nearest-target.ts` (which doesn't export it) — same capability-boundary
-// reasoning that file already documents for not importing
-// tone-field-detection's cents helper: keep each layer's cents math local
-// rather than growing a shared-but-private dependency between an
-// application-layer file and a domain-layer one.
-function centsBetween(a: number, b: number): number {
-  return 1200 * Math.log2(a / b)
-}
 
 // How far (in cents) a fresh `detectedHz` reading may drift from the
 // currently-locked target before it's treated as a genuinely different note
@@ -41,26 +43,18 @@ interface LockedTarget {
 }
 
 /**
- * Holds the currently active `Scale` and resolves a detected fundamental
- * (Hz) to its nearest target note within that scale.
+ * Resolves a detected fundamental (Hz) to its nearest equal-tempered note —
+ * pure chromatic resolution via `frequencyToNote`/`noteToFrequency`, not
+ * constrained to any named scale's note list. Whatever tone field is
+ * currently struck is compared against the nearest correct pitch, full
+ * stop.
  */
-export class SelectScale {
-  private activeScale: Scale
+export class ResolveTargetNote {
   private referencePitchHz: number
   private lock: LockedTarget | null = null
 
-  constructor(initialScale: Scale, referencePitchHz: number = UNVERIFIED_DEFAULT_REFERENCE_PITCH_HZ) {
-    this.activeScale = initialScale
+  constructor(referencePitchHz: number = UNVERIFIED_DEFAULT_REFERENCE_PITCH_HZ) {
     this.referencePitchHz = referencePitchHz
-  }
-
-  getActiveScale(): Scale {
-    return this.activeScale
-  }
-
-  setActiveScale(scale: Scale): void {
-    this.activeScale = scale
-    this.lock = null
   }
 
   getReferencePitchHz(): number {
@@ -73,27 +67,26 @@ export class SelectScale {
   }
 
   /**
-   * Resolves `detectedHz` to a `NearestTarget`, but "sticky": once a target
+   * Resolves `detectedHz` to a `ResolvedTarget`, but "sticky": once a target
    * note is locked, it keeps being returned as the displayed reference note
    * for as long as `detectedHz` stays within
    * `STICKY_LOCK_RELOCK_THRESHOLD_CENTS` of that locked note's frequency —
    * only `centDeviation` is recomputed fresh against the live `detectedHz`
    * each call.
    *
-   * Why: this method used to call `nearestTarget()` fresh on every rAF
-   * frame with no memory between calls. Live-hardware testing showed that
-   * as a struck note's sound decays (or a nearby tone field's resonance
-   * bleeds into the mic), a single noisy/decayed frame's raw pitch reading
-   * could flip which note the app reports as the target — usually jumping
-   * to the lowest/Ding note — even though the player is still hearing
-   * (the decay of) the same struck note. Locking the target and only
-   * relocking on a clearly-different reading fixes the displayed reference
-   * note while keeping the live tuning feedback (`centDeviation`)
-   * responsive. This does not address the underlying autocorrelation
-   * octave/subharmonic misdetection that can produce a wrong `detectedHz`
-   * in the first place — that's a separate, DSP-layer concern.
+   * Why: calling `frequencyToNote` fresh on every rAF frame with no memory
+   * lets a single noisy/decayed frame's raw pitch reading flip which note is
+   * reported as the target — usually jumping to a neighboring semitone —
+   * even though the player is still hearing (the decay of) the same struck
+   * note. Locking the target and only relocking on a clearly-different
+   * reading fixes the displayed reference note while keeping the live
+   * tuning feedback (`centDeviation`) responsive. This does not fix the
+   * underlying autocorrelation octave/subharmonic misdetection that can
+   * produce a wrong `detectedHz` in the first place (`autocorrelation.ts`)
+   * — that's a separate, not-yet-scoped DSP concern; this only mitigates
+   * the symptom at the scale-configuration layer.
    */
-  nearestTargetFor(detectedHz: number): NearestTarget {
+  resolveTarget(detectedHz: number): ResolvedTarget {
     if (this.lock !== null) {
       const centDeviation = centsBetween(detectedHz, this.lock.targetHz)
       if (Math.abs(centDeviation) <= STICKY_LOCK_RELOCK_THRESHOLD_CENTS) {
@@ -101,8 +94,10 @@ export class SelectScale {
       }
     }
 
-    const resolved = nearestTarget(detectedHz, this.activeScale, this.referencePitchHz)
-    this.lock = { note: resolved.note, targetHz: resolved.targetHz }
-    return resolved
+    const note = frequencyToNote(detectedHz, this.referencePitchHz)
+    const targetHz = noteToFrequency(note, this.referencePitchHz)
+    const centDeviation = centsBetween(detectedHz, targetHz)
+    this.lock = { note, targetHz }
+    return { note, targetHz, centDeviation }
   }
 }

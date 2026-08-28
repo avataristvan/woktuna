@@ -37,9 +37,9 @@ export interface SpectrumReading {
 
 /**
  * Dependency-inversion boundary for whole-spectrum analysis, as opposed to
- * `PartialDetector`'s band-limited peak search — for callers (a future
- * crosstalk display or spectrum/equalizer view) that need the full
- * magnitude spectrum rather than a specific partial's frequency.
+ * `PartialDetector`'s band-limited peak search — for callers (the
+ * spectrum/equalizer view) that need the full magnitude spectrum rather
+ * than a specific partial's frequency.
  */
 export interface SpectrumAnalyzer {
   analyzeSpectrum(frame: Float32Array, sampleRate: number): SpectrumReading

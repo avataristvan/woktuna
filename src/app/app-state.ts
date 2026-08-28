@@ -1,4 +1,3 @@
-import type { Scale } from '../capabilities/scale-configuration/domain/scale'
 import type { HammerMode } from '../capabilities/tone-field-visualization/domain/hammer-direction'
 
 export type { HammerMode }
@@ -10,12 +9,7 @@ export type { HammerMode }
  * `buildGuidance`.
  */
 export class AppState {
-  activeScale: Scale
   hammerMode: HammerMode = 'outside'
-
-  constructor(initialScale: Scale) {
-    this.activeScale = initialScale
-  }
 
   setHammerMode(mode: HammerMode): void {
     this.hammerMode = mode

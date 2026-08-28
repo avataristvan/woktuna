@@ -2,8 +2,8 @@
  * Shared low-level FFT primitives (windowing, magnitude-spectrum
  * computation, the radix-2 FFT itself). Extracted from
  * `fft-peak-picking.ts` so the octave/compound-fifth peak search and the
- * general-purpose spectrum analyzer (used by later crosstalk/spectrum-view
- * features) share one FFT implementation instead of duplicating it.
+ * general-purpose spectrum analyzer (used by the spectrum/equalizer view)
+ * share one FFT implementation instead of duplicating it.
  *
  * `computeMagnitudeSpectrumF64` is the internal building block — it's what
  * `fft-peak-picking.ts` calls directly, unchanged from before this file was
@@ -11,7 +11,8 @@
  * same Float64Array precision it always has. `computeMagnitudeSpectrum` is
  * the public, capability-external entry point (returned via the
  * `SpectrumAnalyzer` port): same underlying computation, cast to
- * Float32Array at the boundary and paired with bin/Hz conversion helpers.
+ * Float32Array at the boundary and paired with bin/Hz conversion helpers,
+ * used by the spectrum/equalizer view.
  */
 
 /** Largest power of 2 that fits within `n` samples — the FFT below is radix-2 and needs one. */
@@ -109,8 +110,7 @@ export interface Spectrum {
  * same computation `fft-peak-picking.ts` uses internally for its
  * octave/compound-fifth search) and exposes it generically, with bin↔Hz
  * conversion helpers, for callers that need the whole spectrum rather than
- * a band-limited peak search (e.g. a future spectrum/equalizer view or
- * crosstalk display).
+ * a band-limited peak search (the spectrum/equalizer view).
  *
  * Defaults `fftSize` to the largest power of 2 that fits in `frame`, same
  * truncation rule `fft-peak-picking.ts` applies.

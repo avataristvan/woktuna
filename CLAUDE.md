@@ -34,7 +34,7 @@ src/
   app/                # composition root: wires infra adapters → use-cases → presentation
   shared-kernel/       # vocabulary shared across capabilities (PartialKind, axis mapping, etc.)
   capabilities/
-    scale-configuration/     # note/frequency conversion, nearest-target lookup
+    scale-configuration/     # note/frequency conversion + pure chromatic nearest-note resolution
     tone-field-detection/    # autocorrelation (fundamental) + FFT peak-picking (octave/fifth)
     tone-field-visualization/ # deviation → guidance mapping, Canvas renderer
 ```
@@ -48,6 +48,47 @@ happens in `app/`.
 As of Chunk 1, `src/app/`, `src/shared-kernel/`, `src/capabilities/` are
 empty scaffolding (`.gitkeep` only) — real logic lands starting Chunk 2.
 
+## Architecture pivot: chromatic-only tuning (2026-08-28)
+
+The app used to require picking a named `Scale` (e.g. "D Kurd") and matched
+each struck note against that scale's specific note list — plus a "detect
+scale from strikes" auto-matching flow and a crosstalk-warning feature that
+checked for bleed from the scale's *other* notes. After live-testing, the
+user found the scale concept didn't actually help: what matters is getting
+whatever tone field is currently being struck to its nearest correct pitch,
+full stop. This was deliberately removed, not an oversight:
+
+- `scale-configuration`'s `Scale` type, `known-scales.ts` (`KNOWN_SCALES`),
+  and the scale-based `nearestTarget` lookup are gone. The capability now
+  does **pure chromatic nearest-semitone resolution** — every struck note is
+  compared to the nearest equal-tempered note (any of the 12 semitones),
+  via `domain/note.ts`'s `frequencyToNote`/`noteToFrequency`. The former
+  `SelectScale` application class is now `ResolveTargetNote`
+  (`application/resolve-target-note.ts`); its `nearestTargetFor()` is now
+  `resolveTarget()`, same `{ note, targetHz, centDeviation }` shape and the
+  same sticky target-note lock behavior, just resolving chromatically
+  instead of against a scale's note list. Reference pitch (`referencePitchHz`
+  get/set) is unchanged and still explicitly user-configurable.
+- The entire `scale-inference` capability (auto-detect a scale from a
+  strike sequence) is deleted — it existed specifically to identify which
+  named scale was being played; with no scale concept, it had no job left.
+- The entire `crosstalk-detection` capability is deleted — it worked by
+  checking a scale's *other* notes for suspicious energy bleed. With no
+  scale, there's no defined "other notes of this instrument" to check
+  against, and redefining it generically was explicitly rejected in favor
+  of just removing it.
+- The scale `<select>`, "Detect scale from strikes" button/readout, and
+  crosstalk readout are gone from `src/main.ts`/`src/app/bootstrap.ts`.
+  Reference pitch, tolerance-cents, hammer-mode toggle, and the
+  spectrum/equalizer view are untouched — none of those depended on the
+  scale concept.
+- The word "crosstalk" still appears in `tone-field-detection`'s DSP
+  comments (`fft-peak-picking.ts` etc.) — that's the unrelated *acoustic*
+  phenomenon (a neighboring tone field's resonance bleeding into the FFT
+  search band), still a real, unresolved DSP concern per
+  `handpan-stimm-app-recherche.md` §2.5. Only the `crosstalk-detection`
+  *feature* (a UI warning built on top of scale note-lists) was removed.
+
 ## Domain knowledge pointers
 
 Each handpan tone field resonates at 3 partials simultaneously: fundamental
@@ -59,10 +100,8 @@ and unverified — kept as an isolated, explicitly-flagged function
 
 ## Known unknowns (do not silently harden into false precision)
 
-- Reference pitch for scale frequencies (A4=440 vs 443 vs other) — must stay
+- Reference pitch for note frequencies (A4=440 vs 443 vs other) — must stay
   a configurable parameter, no default confirmed yet.
-- `known-scales.ts` (Chunk 3+) ships placeholder scale data — needs user
-  verification against a trusted source before real tuning use.
 - FFT tolerance window for octave/fifth search (`DEFAULT_TOLERANCE_CENTS` in
   `fft-peak-picking.ts`, implemented Chunk 6 at ±250 cents) — likely needs
   tuning after real-hardware testing; see the Chunk 6 DSP gotcha below for

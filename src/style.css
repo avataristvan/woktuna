@@ -67,24 +67,12 @@ main {
   font-variant-numeric: tabular-nums;
 }
 
-.crosstalk-readout {
-  min-height: 1.2em;
-  color: #e0a030;
-}
-
-.scale-detection,
 .spectrum-panel {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.4rem;
   width: 100%;
-}
-
-#scale-detection-readout {
-  margin: 0;
-  font-size: 0.9em;
-  opacity: 0.85;
 }
 
 #spectrum-canvas {
