@@ -34,6 +34,11 @@ main {
   flex-wrap: wrap;
 }
 
+#reference-pitch-input {
+  width: 5em;
+  font-variant-numeric: tabular-nums;
+}
+
 .hammer-mode {
   display: flex;
   align-items: center;

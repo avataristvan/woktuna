@@ -26,6 +26,23 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <select id="scale-select"></select>
       <button id="start-button" type="button">Start tuning</button>
     </div>
+    <div class="controls">
+      <label for="reference-pitch-input">Reference pitch (Hz)</label>
+      <input
+        type="number"
+        id="reference-pitch-input"
+        list="reference-pitch-presets"
+        value="440"
+        min="400"
+        max="480"
+        step="0.1"
+      />
+      <datalist id="reference-pitch-presets">
+        <option value="440"></option>
+        <option value="442"></option>
+        <option value="443"></option>
+      </datalist>
+    </div>
     <fieldset class="hammer-mode">
       <legend>Hammering from</legend>
       <label><input type="radio" name="hammer-mode" value="outside" checked /> Outside</label>
@@ -66,6 +83,9 @@ const spectrumToggle =
   document.querySelector<HTMLInputElement>('#spectrum-toggle')!
 const spectrumCanvas =
   document.querySelector<HTMLCanvasElement>('#spectrum-canvas')!
+const referencePitchInput = document.querySelector<HTMLInputElement>(
+  '#reference-pitch-input',
+)!
 
 for (const scale of KNOWN_SCALES) {
   const option = document.createElement('option')
@@ -84,6 +104,26 @@ const app = bootstrap({
 
 scaleSelect.addEventListener('change', () => {
   app.selectScale(scaleSelect.value)
+})
+
+// Sane instrument-tuning range, not a claim about a correct value — see
+// `UNVERIFIED_DEFAULT_REFERENCE_PITCH_HZ` in `select-scale.ts`.
+const MIN_REFERENCE_PITCH_HZ = 400
+const MAX_REFERENCE_PITCH_HZ = 480
+let lastValidReferencePitchHz = referencePitchInput.valueAsNumber
+
+referencePitchInput.addEventListener('change', () => {
+  const hz = referencePitchInput.valueAsNumber
+  if (
+    !Number.isFinite(hz) ||
+    hz < MIN_REFERENCE_PITCH_HZ ||
+    hz > MAX_REFERENCE_PITCH_HZ
+  ) {
+    referencePitchInput.value = String(lastValidReferencePitchHz)
+    return
+  }
+  lastValidReferencePitchHz = hz
+  app.setReferencePitchHz(hz)
 })
 
 for (const input of hammerModeInputs) {

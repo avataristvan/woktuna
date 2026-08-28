@@ -4,8 +4,10 @@ import { nearestTarget } from '../domain/nearest-target'
 
 // 440Hz is an UNVERIFIED PLACEHOLDER default reference pitch, per plan Open
 // Item #1 — this repo has no confirmed source for what reference pitch real
-// handpans in this project should be tuned to (some makers use 443Hz). It
-// must remain overridable, never treated as a confirmed constant.
+// handpans in this project should be tuned to (some makers use 443Hz). It's
+// only the starting value: `src/main.ts` exposes a UI control (backed by
+// `setReferencePitchHz` below) that lets the user change it at any time, so
+// it must never be hardened into a fixed, unconfigurable constant.
 const UNVERIFIED_DEFAULT_REFERENCE_PITCH_HZ = 440
 
 /**

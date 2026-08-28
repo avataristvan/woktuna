@@ -43,6 +43,7 @@ export interface ToneFieldApp {
   startScaleDetection(): void
   finishScaleDetection(): InferredScale
   setSpectrumVisible(visible: boolean): void
+  setReferencePitchHz(hz: number): void
 }
 
 /**
@@ -172,6 +173,10 @@ export function bootstrap(elements: ToneFieldUiElements): ToneFieldApp {
       if (visible && !spectrumRenderer) {
         spectrumRenderer = new SpectrumViewRenderer(elements.spectrumCanvas)
       }
+    },
+
+    setReferencePitchHz(hz: number) {
+      selectScale.setReferencePitchHz(hz)
     },
   }
 }
