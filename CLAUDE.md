@@ -273,6 +273,37 @@ crosstalk-detection, spectrum view)
   resolves — scale detection depends on the same live tick loop as the main
   tuning view.
 
+## DSP/domain gotchas (reference-pitch UI wiring — post-Chunk-I)
+
+- `SelectScale.getReferencePitchHz()`/`setReferencePitchHz()` existed and
+  were already threaded into `bootstrap.ts` (crosstalk check,
+  `finishScaleDetection`'s `inferScale` call) before the UI control existed
+  — the only gap was exposing a way to change it. `ToneFieldApp` gained
+  `setReferencePitchHz(hz: number): void`, a thin passthrough to
+  `selectScale.setReferencePitchHz(hz)`. No explicit re-render call is
+  needed: `tick()` already calls `selectScale.nearestTargetFor()` fresh
+  every frame and reads `referencePitchHz` live, so a mid-session pitch
+  change takes effect on the very next rAF frame — same pattern as the
+  Chunk 8 hammer-mode toggle.
+- UI in `src/main.ts`: `#reference-pitch-input` (`<input type="number">`,
+  min=400/max=480/step=0.1, default 440) plus a `#reference-pitch-presets`
+  `<datalist>` suggesting 440/442/443Hz. The presets are offered as common
+  reference points, not asserted as a confirmed standard — matches this
+  repo's stance (see "Known unknowns" above) that no single reference pitch
+  is verified correct for handpans, only that it must stay configurable.
+  Invalid/out-of-range input on `change` reverts the field to the last
+  accepted value (`lastValidReferencePitchHz`, a closure var — not
+  hardcoded back to 440) rather than passing nonsense through to
+  `SelectScale`.
+- `UNVERIFIED_DEFAULT_REFERENCE_PITCH_HZ` in `select-scale.ts` is now
+  documented as a *starting* value overridable via this UI, not a fixed
+  unconfigurable placeholder — its value (440) and `SelectScale`'s behavior
+  were not changed.
+- Pure UI-wiring chunk: `infrastructure/browser`/`app/`/presentation-layer
+  scope only, no domain/application logic touched, no new tests added (per
+  this repo's testing convention — see "Testing conventions" below). All
+  129 existing tests still pass.
+
 ## PWA policy
 
 The service worker must only register in production. `vite-plugin-pwa`'s
