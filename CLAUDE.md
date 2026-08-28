@@ -122,6 +122,30 @@ and unverified — kept as an isolated, explicitly-flagged function
   element) to stay correctly scaled — both must be disconnected in
   `dispose()`.
 
+## DSP/domain gotchas (Chunk 7: axis markers wired to partial deviations)
+
+- `shared-kernel/partial-kind.ts` now holds the canonical `PartialKind`/`Axis`
+  vocabulary and the octave (2x)/compound-fifth (3x) ratio constants used by
+  `tone-field-visualization`. It deliberately **duplicates** (does not
+  import) `tone-field-detection/domain/tuning-rules.ts`'s
+  `expectedPartialRatio` — shared-kernel sits below capabilities in the
+  dependency graph, so importing a capability's domain module from
+  shared-kernel would invert that direction. `tone-field-detection` was left
+  untouched (its own local `PartialKind`/`expectedPartialRatio` still exist
+  independently) — reconciling the two was explicitly out of this chunk's
+  scope. Keep the ratio constants in sync by hand if they ever change.
+- `deviation-to-guidance.ts`'s `deviationToGuidance` now takes two additional
+  optional params (`octaveCentDeviation`, `compoundFifthCentDeviation`,
+  default `null`) mapped to `longAxis`/`shortAxis` via
+  `shared-kernel/partial-kind.ts`'s `axisForPartial`. `null` means "no
+  reading" (detector found no clear peak) and must stay `null`, not become a
+  fabricated zero-deviation "in tune" axis reading.
+- `build-guidance.ts` derives octave/fifth *target* frequencies from the
+  fundamental's target × the shared-kernel ratio (`targetHz * 2`,
+  `targetHz * 3`) — it does not do a second scale lookup. A tone field's
+  partials are expected at fixed ratios above its own fundamental, not
+  independent scale notes.
+
 ## PWA policy
 
 The service worker must only register in production. `vite-plugin-pwa`'s

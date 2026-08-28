@@ -50,4 +50,42 @@ describe('deviationToGuidance', () => {
     expect(guidance.radial.severity).toBe('inTune')
     expect(guidance.hammerBias).toBe('inTune')
   })
+
+  describe('axis guidance', () => {
+    it('leaves longAxis/shortAxis null when no octave/fifth deviation is given', () => {
+      const guidance = deviationToGuidance(0)
+
+      expect(guidance.longAxis).toBeNull()
+      expect(guidance.shortAxis).toBeNull()
+    })
+
+    it('populates longAxis from the octave deviation, mapped to the long axis', () => {
+      const guidance = deviationToGuidance(0, 12, null)
+
+      expect(guidance.longAxis).toEqual({ axis: 'long', centDeviation: 12, severity: 'slight' })
+      expect(guidance.shortAxis).toBeNull()
+    })
+
+    it('populates shortAxis from the compound-fifth deviation, mapped to the short axis', () => {
+      const guidance = deviationToGuidance(0, null, -35)
+
+      expect(guidance.shortAxis).toEqual({ axis: 'short', centDeviation: -35, severity: 'significant' })
+      expect(guidance.longAxis).toBeNull()
+    })
+
+    it('populates both axes independently with different severities when both are present', () => {
+      const guidance = deviationToGuidance(0, 3, 20)
+
+      expect(guidance.longAxis).toEqual({ axis: 'long', centDeviation: 3, severity: 'inTune' })
+      expect(guidance.shortAxis).toEqual({ axis: 'short', centDeviation: 20, severity: 'moderate' })
+    })
+
+    it('keeps longAxis/shortAxis independent of the radial/fundamental severity', () => {
+      const guidance = deviationToGuidance(45, 0, 0)
+
+      expect(guidance.radial.severity).toBe('significant')
+      expect(guidance.longAxis).toEqual({ axis: 'long', centDeviation: 0, severity: 'inTune' })
+      expect(guidance.shortAxis).toEqual({ axis: 'short', centDeviation: 0, severity: 'inTune' })
+    })
+  })
 })

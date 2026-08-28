@@ -1,4 +1,6 @@
-import type { Severity, ToneFieldGuidance } from './guidance-model'
+import type { Axis } from '../../../shared-kernel/partial-kind'
+import { axisForPartial } from '../../../shared-kernel/partial-kind'
+import type { AxisGuidance, Severity, ToneFieldGuidance } from './guidance-model'
 
 /**
  * Severity thresholds in absolute cents. Deliberately coarse — this is a
@@ -18,17 +20,30 @@ function centDeviationToSeverity(centDeviation: number): Severity {
 }
 
 /**
- * Maps a fundamental's cent deviation from its target to hammer guidance.
+ * Builds one axis's guidance from its cent deviation, or `null` when the
+ * partial reading is absent (detector found no clear peak for it — see
+ * `fft-peak-picking.ts`). `null` here means "no reading available", not "in
+ * tune" — the caller must not fabricate a zero-deviation reading for a
+ * missing partial.
+ */
+function toAxisGuidance(axis: Axis, centDeviation: number | null): AxisGuidance | null {
+  if (centDeviation === null) return null
+  return { axis, centDeviation, severity: centDeviationToSeverity(centDeviation) }
+}
+
+/**
+ * Maps a struck tone field's partial cent deviations to hammer guidance.
  *
  * Per research doc §2.2: hammering the center raises pitch, hammering the
  * edge lowers it. So a flat (too-low, negative deviation) fundamental needs
  * a center-biased hit to bring it up, and a sharp (too-high, positive
  * deviation) fundamental needs an edge-biased hit to bring it down.
  *
- * `longAxis`/`shortAxis` are not populated by this chunk — octave/compound-
- * fifth partial detection lands in a later chunk. The signature already
- * carries their type so that later chunk only has to fill in real values,
- * not restructure this function or its callers.
+ * `octaveCentDeviation`/`compoundFifthCentDeviation` are optional and
+ * default to `null` (no reading) so existing single-argument callers keep
+ * working. When present, they're mapped to `longAxis`/`shortAxis` via
+ * shared-kernel's axis mapping (octave → long axis, compound fifth → short
+ * axis, per research doc §2.1).
  *
  * IMPORTANT — do not "upgrade" this into a precise crosshair. Per research
  * doc §2.4, real hammering technique is several distributed blows around
@@ -44,7 +59,11 @@ function centDeviationToSeverity(centDeviation: number): Severity {
  * (sound hole) inverts the center/edge direction — that inversion is not
  * implemented here; Chunk 8's `hammer-direction.ts` will handle it.
  */
-export function deviationToGuidance(fundamentalCentDeviation: number): ToneFieldGuidance {
+export function deviationToGuidance(
+  fundamentalCentDeviation: number,
+  octaveCentDeviation: number | null = null,
+  compoundFifthCentDeviation: number | null = null,
+): ToneFieldGuidance {
   const severity = centDeviationToSeverity(fundamentalCentDeviation)
   const hammerBias =
     severity === 'inTune' ? 'inTune' : fundamentalCentDeviation < 0 ? 'center' : 'edge'
@@ -54,8 +73,8 @@ export function deviationToGuidance(fundamentalCentDeviation: number): ToneField
       centDeviation: fundamentalCentDeviation,
       severity,
     },
-    longAxis: null,
-    shortAxis: null,
+    longAxis: toAxisGuidance(axisForPartial('octave'), octaveCentDeviation),
+    shortAxis: toAxisGuidance(axisForPartial('compoundFifth'), compoundFifthCentDeviation),
     hammerBias,
   }
 }
