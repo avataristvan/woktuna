@@ -233,6 +233,58 @@ causes confusing "my change isn't showing up" symptoms (seen in an earlier
 project). Don't flip this on
 without adding an explicit dev-mode `unregister()` fallback.
 
+**TODO (human/future chunk):** wire a dev-mode SW `unregister()` fallback
+into `src/main.ts` (guarded by `import.meta.env.DEV`, e.g. iterate
+`navigator.serviceWorker.getRegistrations()` and unregister each). This was
+called for in Chunk 9 but deliberately not implemented there — Chunk 9 was
+scoped to only touch `vite.config.ts`, `public/icons/**`, `index.html`, and
+`CLAUDE.md` (parallel-safety constraint with concurrent chunks touching
+`src/app/**`), so it could not touch `main.ts`. Purpose: clears a stale SW
+left in a browser profile from earlier manual testing, in case someone
+toggles `devOptions.enabled` to `true` for local debugging and forgets to
+flip it back — without this fallback that stale SW would keep serving a
+cached build indefinitely.
+
+## Icons (Chunk 9)
+
+`public/icons/icon.svg` is the source icon — a simple abstract motif (dark
+rounded-square background, an oval "tone field" split by a crosshair with a
+center dimple) evoking the handpan tone-field/axis concept described in
+`handpan-stimm-app-recherche.md`. It's a placeholder-but-real icon, not
+final branding.
+
+All other files in `public/icons/` (`icon-64.png`, `icon-192.png`,
+`icon-512.png`, `icon-maskable-512.png`, `apple-touch-icon-180.png`,
+`favicon.ico`) are generated from `icon.svg` via `@vite-pwa/assets-generator`
+(devDependency, pinned `1.0.2`) — do not hand-edit them, regenerate from the
+source SVG instead. The maskable variant uses 0.25 padding with the brand's
+`#1a1a1a` background (not the tool's default white) so it reads correctly
+inside Android's adaptive-icon circular mask. The manifest's `icons` array
+in `vite.config.ts` must list all five raster/vector entries with matching
+`sizes`, including the one `purpose: "maskable"` entry — the Chunk 1
+placeholder set was missing the maskable icon and the manifest `id` field;
+both are now present (`id: '/'`).
+
+To regenerate after changing `icon.svg`: there's no checked-in
+`pwa-assets.config.mjs` (keeping this chunk's file-touch scope minimal) —
+run `npx @vite-pwa/assets-generator@1.0.2` with an inline config that
+overrides `minimalPreset`'s `maskable`/`apple` `resizeOptions.background`
+to `'#1a1a1a'` (default is white, which looks wrong against this app's dark
+theme) and `transparent.padding` to `0` (edge-to-edge, since `icon.svg`
+already bakes in its own rounded-corner background). Copy the generated
+`pwa-64x64.png` → `icon-64.png`, `pwa-192x192.png` → `icon-192.png`,
+`pwa-512x512.png` → `icon-512.png`, `maskable-icon-512x512.png` →
+`icon-maskable-512.png`, `apple-touch-icon-180x180.png` →
+`apple-touch-icon-180.png`, `favicon.ico` as-is.
+
+**Verified statically (Chunk 9):** `npm run build` succeeds;
+`dist/manifest.webmanifest`'s icon `sizes` match each PNG's actual
+dimensions (checked via `file`); all declared icon files exist in
+`dist/icons/`. **Not verifiable without a real browser** — a human/future
+chunk needs to check with an actual Lighthouse panel: the installability
+prompt fires, the "Add to Home Screen" flow produces a correctly-masked
+adaptive icon on Android, and offline behavior after first load.
+
 ## Testing conventions
 
 - `domain/` and `infrastructure/dsp/` files get co-located `*.spec.ts`
