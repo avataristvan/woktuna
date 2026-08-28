@@ -4,12 +4,16 @@
  * `autocorrelation.ts`). No library does multi-partial detection relative to
  * a dynamically-detected fundamental — this is hand-rolled, including a
  * small self-contained radix-2 FFT, per the plan's explicit call to avoid a
- * new npm dependency for this.
+ * new npm dependency for this. The FFT/windowing/magnitude computation
+ * itself lives in `fft.ts` and is shared with the general-purpose
+ * `SpectrumAnalyzer` port — not duplicated here.
  *
  * Pure algorithm — no Web Audio dependency, operates on a plain
  * Float32Array + sample rate so it's unit-testable against synthetic
  * multi-partial signals.
  */
+
+import { computeMagnitudeSpectrumF64, largestPowerOfTwoAtMost } from './fft'
 
 /**
  * Search-band half-width, in cents, around each expected partial location
@@ -93,7 +97,7 @@ export function detectPartialsByFftPeakPicking(
     return { octaveHz: null, compoundFifthHz: null }
   }
 
-  const magnitude = computeMagnitudeSpectrum(frame, fftSize)
+  const magnitude = computeMagnitudeSpectrumF64(frame, fftSize)
 
   const fundamentalPeak = bandPeak(magnitude, sampleRate, fftSize, fundamentalHz, FUNDAMENTAL_REFERENCE_TOLERANCE_CENTS)
   if (fundamentalPeak === null || !isGenuineSpectralPeak(magnitude, fundamentalPeak)) {
@@ -246,89 +250,6 @@ function localNoiseFloor(magnitude: Float64Array, binLow: number, binHigh: numbe
 
 function centsToRatio(cents: number): number {
   return Math.pow(2, cents / 1200)
-}
-
-/** Largest power of 2 that fits within `n` samples — the FFT below is radix-2 and needs one. */
-function largestPowerOfTwoAtMost(n: number): number {
-  let power = 1
-  while (power * 2 <= n) {
-    power *= 2
-  }
-  return power
-}
-
-/**
- * Applies a Hann window (reduces spectral leakage so a real partial's
- * energy doesn't smear across bins and mask/mimic a neighboring band) and
- * returns the magnitude spectrum (bins 0..fftSize/2 inclusive) via an
- * in-place radix-2 FFT.
- */
-function computeMagnitudeSpectrum(frame: Float32Array, fftSize: number): Float64Array {
-  const real = new Float64Array(fftSize)
-  const imag = new Float64Array(fftSize)
-
-  for (let i = 0; i < fftSize; i++) {
-    const hann = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (fftSize - 1))
-    real[i] = frame[i] * hann
-  }
-
-  fft(real, imag)
-
-  const magnitude = new Float64Array(fftSize / 2 + 1)
-  for (let bin = 0; bin < magnitude.length; bin++) {
-    magnitude[bin] = Math.hypot(real[bin], imag[bin])
-  }
-  return magnitude
-}
-
-/**
- * In-place iterative radix-2 Cooley-Tukey FFT (decimation-in-time). `real`
- * and `imag` must be the same power-of-2 length. Self-contained rather than
- * an npm dependency, per the plan — this is a standard, well-known
- * algorithm, not novel IP.
- */
-function fft(real: Float64Array, imag: Float64Array): void {
-  const n = real.length
-
-  for (let i = 1, j = 0; i < n; i++) {
-    let bit = n >> 1
-    for (; (j & bit) !== 0; bit >>= 1) {
-      j ^= bit
-    }
-    j ^= bit
-    if (i < j) {
-      ;[real[i], real[j]] = [real[j], real[i]]
-      ;[imag[i], imag[j]] = [imag[j], imag[i]]
-    }
-  }
-
-  for (let len = 2; len <= n; len <<= 1) {
-    const angle = (-2 * Math.PI) / len
-    const wLenReal = Math.cos(angle)
-    const wLenImag = Math.sin(angle)
-
-    for (let i = 0; i < n; i += len) {
-      let wReal = 1
-      let wImag = 0
-
-      for (let j = 0; j < len / 2; j++) {
-        const uReal = real[i + j]
-        const uImag = imag[i + j]
-        const vReal = real[i + j + len / 2] * wReal - imag[i + j + len / 2] * wImag
-        const vImag = real[i + j + len / 2] * wImag + imag[i + j + len / 2] * wReal
-
-        real[i + j] = uReal + vReal
-        imag[i + j] = uImag + vImag
-        real[i + j + len / 2] = uReal - vReal
-        imag[i + j + len / 2] = uImag - vImag
-
-        const nextWReal = wReal * wLenReal - wImag * wLenImag
-        const nextWImag = wReal * wLenImag + wImag * wLenReal
-        wReal = nextWReal
-        wImag = nextWImag
-      }
-    }
-  }
 }
 
 function parabolicInterpolate(yBefore: number, yAtPeak: number, yAfter: number, peakIndex: number): number {

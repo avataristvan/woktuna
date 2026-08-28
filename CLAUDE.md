@@ -71,6 +71,29 @@ and unverified — kept as an isolated, explicitly-flagged function
   strike-path diagram (research doc §5) — the whole detection pipeline needs
   real-hardware validation before being trusted for actual tuning.
 
+## DSP gotchas (Chunk D: shared FFT extraction / SpectrumAnalyzer port)
+
+- The FFT/windowing/magnitude-computation core that used to live privately
+  inside `fft-peak-picking.ts` is now `infrastructure/dsp/fft.ts`:
+  `computeMagnitudeSpectrumF64(frame, fftSize)` (Float64Array, same
+  signature/behavior as the old private function) is what
+  `fft-peak-picking.ts` calls internally — its noise-floor gating logic
+  (Chunk 6.5) was **not** touched and still operates on identical Float64
+  precision. `computeMagnitudeSpectrum(frame, sampleRate, fftSize?)` is the
+  new public entry point (returns `{ magnitudes: Float32Array, binToHz,
+  hzToBin }`), exposed via the new `SpectrumAnalyzer` port
+  (`application/ports.ts`) and its `FftSpectrumAnalyzer` adapter
+  (`infrastructure/spectrum-analyzer.ts`). Both paths share the exact same
+  `fft()`/windowing code — don't let a future change reintroduce a second
+  FFT implementation for either.
+- `computeMagnitudeSpectrum`'s public Float32Array is a final cast of the
+  internal Float64Array result, not a separately-computed spectrum — this
+  is safe because comparisons downstream (peak-picking's margin/ratio gates)
+  have headroom orders of magnitude larger than float32 precision loss.
+- This chunk was scoped as a prerequisite for two later post-MVP features
+  (crosstalk display, spectrum/equalizer view) — `SpectrumAnalyzer` isn't
+  wired into `app/bootstrap.ts` yet, only the port + adapter exist.
+
 ## DSP gotchas (Chunk 6: octave/compound-fifth FFT peak-picking)
 
 - `fft-peak-picking.ts` computes its own FFT over the full frame (up to
