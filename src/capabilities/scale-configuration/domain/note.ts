@@ -45,3 +45,21 @@ export function noteToFrequency(note: NoteName, referencePitchHz: number): numbe
   const semitonesFromA4 = (octave - 4) * 12 + (PITCH_CLASS_SEMITONE[pitchClass] - PITCH_CLASS_SEMITONE.A)
   return referencePitchHz * Math.pow(2, semitonesFromA4 / 12)
 }
+
+const SEMITONE_PITCH_CLASS: PitchClass[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+
+/**
+ * Converts a frequency to the nearest equal-tempered note — the inverse of
+ * `noteToFrequency`, using the same A4-relative equal-temperament math.
+ *
+ * `referencePitchHz` (the frequency of A4) is a required parameter for the
+ * same reason as in `noteToFrequency` — no default reference pitch is
+ * assumed. See plan Open Item #1.
+ */
+export function frequencyToNote(hz: number, referencePitchHz: number): NoteName {
+  const semitonesFromA4 = Math.round(12 * Math.log2(hz / referencePitchHz))
+  const semitonesFromC4 = semitonesFromA4 + PITCH_CLASS_SEMITONE.A
+  const octave = 4 + Math.floor(semitonesFromC4 / 12)
+  const pitchClass = SEMITONE_PITCH_CLASS[((semitonesFromC4 % 12) + 12) % 12]
+  return `${pitchClass}${octave}`
+}
