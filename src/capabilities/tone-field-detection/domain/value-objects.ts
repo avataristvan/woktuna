@@ -31,8 +31,9 @@ export interface PartialReading {
 }
 
 /**
- * octave and compoundFifth stay undefined until Chunk 6 adds FFT
- * peak-picking relative to the detected fundamental.
+ * octave and compoundFifth stay undefined when no PartialDetector was
+ * supplied to AnalyzeToneField, or when FFT peak-picking found no clear
+ * peak for that partial in the current frame (see fft-peak-picking.ts).
  */
 export interface ToneFieldReading {
   readonly fundamental: PartialReading

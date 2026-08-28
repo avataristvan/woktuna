@@ -14,3 +14,17 @@ export interface AudioFrameSource {
 export interface PitchDetector {
   detectFundamental(frame: Float32Array, sampleRate: number): Frequency | null
 }
+
+export interface PartialDetectionResult {
+  readonly octave: Frequency | null
+  readonly compoundFifth: Frequency | null
+}
+
+/**
+ * Dependency-inversion boundary for octave/compound-fifth detection,
+ * separate from `PitchDetector` since it searches relative to an
+ * already-detected fundamental rather than finding a pitch from scratch.
+ */
+export interface PartialDetector {
+  detectPartials(frame: Float32Array, sampleRate: number, fundamental: Frequency): PartialDetectionResult
+}

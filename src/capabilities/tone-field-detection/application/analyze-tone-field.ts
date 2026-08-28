@@ -1,6 +1,6 @@
 import type { PartialReading, ToneFieldReading } from '../domain/value-objects'
 import { createFrequency } from '../domain/value-objects'
-import type { AudioFrameSource, PitchDetector } from './ports'
+import type { AudioFrameSource, PartialDetector, PitchDetector } from './ports'
 
 const DEFAULT_SMOOTHING_WINDOW = 5
 
@@ -11,20 +11,28 @@ const DEFAULT_SMOOTHING_WINDOW = 5
  */
 const JUMP_RESET_THRESHOLD_CENTS = 100
 
+export interface AnalyzeToneFieldOptions {
+  smoothingWindow?: number
+  /**
+   * When omitted, octave/compoundFifth stay unpopulated on every returned
+   * reading — this keeps existing callers/tests working unchanged. Passed
+   * in from Chunk 6 onward via bootstrap.ts's FftPartialDetector.
+   */
+  partialDetector?: PartialDetector
+}
+
 export class AnalyzeToneField {
   private readonly audioFrameSource: AudioFrameSource
   private readonly pitchDetector: PitchDetector
+  private readonly partialDetector: PartialDetector | undefined
   private readonly smoothingWindow: number
   private readonly recentFundamentalsHz: number[] = []
 
-  constructor(
-    audioFrameSource: AudioFrameSource,
-    pitchDetector: PitchDetector,
-    smoothingWindow: number = DEFAULT_SMOOTHING_WINDOW,
-  ) {
+  constructor(audioFrameSource: AudioFrameSource, pitchDetector: PitchDetector, options: AnalyzeToneFieldOptions = {}) {
     this.audioFrameSource = audioFrameSource
     this.pitchDetector = pitchDetector
-    this.smoothingWindow = smoothingWindow
+    this.partialDetector = options.partialDetector
+    this.smoothingWindow = options.smoothingWindow ?? DEFAULT_SMOOTHING_WINDOW
   }
 
   /**
@@ -42,9 +50,10 @@ export class AnalyzeToneField {
    * few frames.
    *
    * octave/compoundFifth stay unpopulated on the returned ToneFieldReading
-   * until Chunk 6 adds a PartialDetector (FFT peak-picking relative to this
-   * fundamental) — intentionally omitted here rather than stubbed, so
-   * Chunk 6 can add them without restructuring this method.
+   * unless a PartialDetector was supplied in the constructor options — when
+   * one is, they're populated by searching the *same* frame (not a fresh
+   * one) relative to the just-smoothed fundamental, so all three partials
+   * describe one single strike.
    */
   analyze(): ToneFieldReading | null {
     const frame = this.audioFrameSource.getFrame()
@@ -72,7 +81,17 @@ export class AnalyzeToneField {
       frequency: createFrequency(median(this.recentFundamentalsHz)),
     }
 
-    return { fundamental }
+    if (!this.partialDetector) {
+      return { fundamental }
+    }
+
+    const partials = this.partialDetector.detectPartials(frame, this.audioFrameSource.sampleRate, fundamental.frequency)
+
+    return {
+      fundamental,
+      octave: partials.octave === null ? undefined : { kind: 'octave', frequency: partials.octave },
+      compoundFifth: partials.compoundFifth === null ? undefined : { kind: 'compoundFifth', frequency: partials.compoundFifth },
+    }
   }
 }
 

@@ -1,5 +1,6 @@
 import { WebAudioMicrophoneSource } from '../capabilities/tone-field-detection/infrastructure/browser/web-audio-microphone-source'
 import { AutocorrelationPitchDetector } from '../capabilities/tone-field-detection/infrastructure/pitch-detector'
+import { FftPartialDetector } from '../capabilities/tone-field-detection/infrastructure/partial-detector'
 import { AnalyzeToneField } from '../capabilities/tone-field-detection/application/analyze-tone-field'
 import { SelectScale } from '../capabilities/scale-configuration/application/select-scale'
 import { KNOWN_SCALES } from '../capabilities/scale-configuration/infrastructure/known-scales'
@@ -33,7 +34,8 @@ export function bootstrap(elements: ToneFieldUiElements): ToneFieldApp {
   const selectScale = new SelectScale(appState.activeScale)
   const microphoneSource = new WebAudioMicrophoneSource()
   const pitchDetector = new AutocorrelationPitchDetector()
-  const analyzeToneField = new AnalyzeToneField(microphoneSource, pitchDetector)
+  const partialDetector = new FftPartialDetector()
+  const analyzeToneField = new AnalyzeToneField(microphoneSource, pitchDetector, { partialDetector })
 
   let renderer: CanvasToneFieldRenderer | null = null
 

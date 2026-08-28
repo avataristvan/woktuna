@@ -63,11 +63,42 @@ and unverified — kept as an isolated, explicitly-flagged function
   a configurable parameter, no default confirmed yet.
 - `known-scales.ts` (Chunk 3+) ships placeholder scale data — needs user
   verification against a trusted source before real tuning use.
-- FFT tolerance window for octave/fifth search (±200–300 cents proposed,
-  Chunk 6) — likely needs tuning after real-hardware testing.
+- FFT tolerance window for octave/fifth search (`DEFAULT_TOLERANCE_CENTS` in
+  `fft-peak-picking.ts`, implemented Chunk 6 at ±250 cents) — likely needs
+  tuning after real-hardware testing; see the Chunk 6 DSP gotcha below for
+  the narrow-vs-wide tradeoff.
 - No existing source confirms the exact crosstalk-axis relationship or
   strike-path diagram (research doc §5) — the whole detection pipeline needs
   real-hardware validation before being trusted for actual tuning.
+
+## DSP gotchas (Chunk 6: octave/compound-fifth FFT peak-picking)
+
+- `fft-peak-picking.ts` computes its own FFT over the full frame (up to
+  `DEFAULT_FFT_SIZE`=32768, truncated down to the largest power of 2 that
+  fits) — this is deliberately a *different* window than
+  `autocorrelation.ts`'s 4096-sample `CORRELATION_WINDOW_SAMPLES`. The large
+  window is exactly why that buffer is sized the way it is (see the Chunk
+  5.5 gotcha below); FFT bin resolution needs it, autocorrelation doesn't.
+  Don't let a future refactor try to make these two DSP files share one
+  window length.
+- The octave/compound-fifth search-band tolerance (`DEFAULT_TOLERANCE_CENTS`
+  in `fft-peak-picking.ts`, currently ±250 cents) is an explicit TODO/tunable,
+  not a settled value — too narrow misses badly-detuned partials (the whole
+  point of a *pre*-tuning app), too wide risks locking onto crosstalk from a
+  neighboring tone field (research doc §2.5's open, unresolved question).
+  Needs real-hardware validation before treating as final.
+- A candidate peak only counts as "found" if it's a local maximum within its
+  search band AND at least `MIN_PARTIAL_TO_FUNDAMENTAL_RATIO` (5%) of the
+  fundamental's own peak magnitude — this is what lets a missing partial
+  return `null` instead of a false positive from window-leakage noise.
+  Global-magnitude/median-based noise floors don't work here (the floor is
+  near-zero across most of a mostly-silent synthetic spectrum, so leakage
+  tails from a real neighboring peak can still clear it) — the fundamental's
+  own magnitude is the only reliable per-frame reference.
+- `AnalyzeToneField`'s constructor takes an `AnalyzeToneFieldOptions` object
+  now (`{ smoothingWindow?, partialDetector? }`), not a positional
+  `smoothingWindow` third argument — this changed in Chunk 6 when a fourth
+  dependency (`PartialDetector`) was added.
 
 ## DSP gotchas (Chunk 5.5 fix pass)
 
