@@ -16,9 +16,13 @@
 import { computeMagnitudeSpectrumF64, largestPowerOfTwoAtMost } from './fft'
 
 /**
- * Search-band half-width, in cents, around each expected partial location
- * (~2×f0 for the octave, ~3×f0 for the compound fifth). TODO/tunable per
- * the plan — real-hardware validation is needed to settle this:
+ * Default search-band half-width, in cents, around each expected partial
+ * location (~2×f0 for the octave, ~3×f0 for the compound fifth), used when
+ * no `toleranceCents` option is passed. User-adjustable at runtime via the
+ * `#tolerance-cents-input` UI control in `main.ts` (threaded through
+ * `FftPartialDetector.setToleranceCents`) — this default itself is still
+ * TODO/tunable per the plan, real-hardware validation is needed to settle
+ * it:
  *  - Too narrow risks missing a badly-detuned partial, which defeats the
  *    purpose of a *pre*-tuning app (the whole point is to find partials that
  *    are NOT yet at the expected ratio).

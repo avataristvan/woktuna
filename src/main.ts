@@ -43,6 +43,23 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         <option value="443"></option>
       </datalist>
     </div>
+    <div class="controls">
+      <label for="tolerance-cents-input">Partial search tolerance (cents)</label>
+      <input
+        type="number"
+        id="tolerance-cents-input"
+        list="tolerance-cents-presets"
+        value="250"
+        min="50"
+        max="500"
+        step="1"
+      />
+      <datalist id="tolerance-cents-presets">
+        <option value="150"></option>
+        <option value="250"></option>
+        <option value="350"></option>
+      </datalist>
+    </div>
     <fieldset class="hammer-mode">
       <legend>Hammering from</legend>
       <label><input type="radio" name="hammer-mode" value="outside" checked /> Outside</label>
@@ -86,6 +103,9 @@ const spectrumCanvas =
 const referencePitchInput = document.querySelector<HTMLInputElement>(
   '#reference-pitch-input',
 )!
+const toleranceCentsInput = document.querySelector<HTMLInputElement>(
+  '#tolerance-cents-input',
+)!
 
 for (const scale of KNOWN_SCALES) {
   const option = document.createElement('option')
@@ -124,6 +144,28 @@ referencePitchInput.addEventListener('change', () => {
   }
   lastValidReferencePitchHz = hz
   app.setReferencePitchHz(hz)
+})
+
+// DEFAULT_TOLERANCE_CENTS in fft-peak-picking.ts is 250; 50-500 keeps the
+// field within an instrument-tuning-sane range without asserting a correct
+// value — see the doc comment on that constant for the narrow-vs-wide
+// tradeoff this controls.
+const MIN_TOLERANCE_CENTS = 50
+const MAX_TOLERANCE_CENTS = 500
+let lastValidToleranceCents = toleranceCentsInput.valueAsNumber
+
+toleranceCentsInput.addEventListener('change', () => {
+  const cents = toleranceCentsInput.valueAsNumber
+  if (
+    !Number.isFinite(cents) ||
+    cents < MIN_TOLERANCE_CENTS ||
+    cents > MAX_TOLERANCE_CENTS
+  ) {
+    toleranceCentsInput.value = String(lastValidToleranceCents)
+    return
+  }
+  lastValidToleranceCents = cents
+  app.setToleranceCents(cents)
 })
 
 for (const input of hammerModeInputs) {

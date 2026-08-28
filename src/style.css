@@ -34,7 +34,8 @@ main {
   flex-wrap: wrap;
 }
 
-#reference-pitch-input {
+#reference-pitch-input,
+#tolerance-cents-input {
   width: 5em;
   font-variant-numeric: tabular-nums;
 }

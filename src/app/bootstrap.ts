@@ -44,6 +44,7 @@ export interface ToneFieldApp {
   finishScaleDetection(): InferredScale
   setSpectrumVisible(visible: boolean): void
   setReferencePitchHz(hz: number): void
+  setToleranceCents(cents: number): void
 }
 
 /**
@@ -177,6 +178,10 @@ export function bootstrap(elements: ToneFieldUiElements): ToneFieldApp {
 
     setReferencePitchHz(hz: number) {
       selectScale.setReferencePitchHz(hz)
+    },
+
+    setToleranceCents(cents: number) {
+      partialDetector.setToleranceCents(cents)
     },
   }
 }

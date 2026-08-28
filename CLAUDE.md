@@ -304,6 +304,39 @@ crosstalk-detection, spectrum view)
   this repo's testing convention — see "Testing conventions" below). All
   129 existing tests still pass.
 
+## DSP/domain gotchas (FFT tolerance UI wiring — post-Chunk-I)
+
+- `FftPartialDetector` (infrastructure/partial-detector.ts) gained a
+  constructor param (`toleranceCents?: number`) plus a runtime
+  `setToleranceCents(cents: number): void` setter — mutable at runtime, not
+  fixed at construction, because the app already has a live mic session
+  running by the time a user might adjust this. It's passed as
+  `{ toleranceCents }` into `detectPartialsByFftPeakPicking`, which already
+  supported the option (Chunk 6) but nothing above it exposed it.
+- `ToneFieldApp` gained `setToleranceCents(cents: number): void`, a thin
+  passthrough to `partialDetector.setToleranceCents(cents)`. No explicit
+  re-render call needed: `tick()` already calls
+  `analyzeToneField.analyze()` every rAF frame, which calls
+  `partialDetector.detectPartials()` fresh each time, reading the mutable
+  field live — same pattern as the reference-pitch and hammer-mode toggles.
+- UI in `src/main.ts`: `#tolerance-cents-input` (`<input type="number">`,
+  min=50/max=500/step=1, default 250) plus a `#tolerance-cents-presets`
+  `<datalist>` suggesting 150/250/350 cents — 250 is
+  `DEFAULT_TOLERANCE_CENTS`, 150/350 bracket it as a narrower/wider option;
+  `fft-peak-picking.spec.ts`'s empirically-measured real cutoff (between 248
+  and 250 cents) is what makes 150 and 350 meaningfully different from the
+  default rather than arbitrary. Invalid/out-of-range input on `change`
+  reverts to `lastValidToleranceCents` (closure var), not hardcoded back to
+  250 — same revert-on-invalid pattern as `#reference-pitch-input`.
+- Unlike most `infrastructure/` adapters (which this repo's testing
+  convention leaves to manual verification — only `domain/` and
+  `infrastructure/dsp/` get co-located specs), `partial-detector.spec.ts`
+  was added as a deliberate exception: it's a genuine integration test (no
+  mocks), synthesizing a frame with an octave detuned 270 cents — just past
+  the default tolerance's measured real cutoff but inside 350 — and
+  asserting the constructor param and the runtime setter each actually
+  change the detection outcome, not just that they're stored.
+
 ## PWA policy
 
 The service worker must only register in production. `vite-plugin-pwa`'s
