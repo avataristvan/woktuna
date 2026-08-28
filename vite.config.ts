@@ -11,7 +11,8 @@ export default defineConfig({
       manifest: {
         name: 'WokTuna',
         short_name: 'WokTuna',
-        description: 'Handpan tuning guidance — shows where and along which axis to hammer each tone field.',
+        description:
+          'Handpan tuning guidance — shows where and along which axis to hammer each tone field.',
         start_url: '/',
         display: 'standalone',
         background_color: '#1a1a1a',
@@ -38,5 +39,6 @@ export default defineConfig({
   ],
   test: {
     environment: 'jsdom',
+    exclude: ['**/node_modules/**', '**/dist/**', '.claude/**'],
   },
 })

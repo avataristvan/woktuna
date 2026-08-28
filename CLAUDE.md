@@ -3,8 +3,8 @@
 ## Overview
 
 WokTuna is an installable PWA that guides tuning a handpan (a dished metal
-percussion instrument): for each oval tone field it shows *where* to hammer
-(center↔edge) and *along which axis* (long=octave, short=compound-fifth),
+percussion instrument): for each oval tone field it shows _where_ to hammer
+(center↔edge) and _along which axis_ (long=octave, short=compound-fifth),
 based on live multi-partial pitch detection from the microphone. Domain
 knowledge source: `handpan-stimm-app-recherche.md` (German) at repo root.
 Full architecture/build plan: `~/.claude/plans/rippling-hugging-raven.md` (local, not part of this repo).
