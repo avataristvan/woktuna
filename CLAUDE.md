@@ -225,6 +225,54 @@ and unverified — kept as an isolated, explicitly-flagged function
   outside checked by default) — deliberately not a `<select>` like the
   scale picker, since a binary either/or reads better as a two-way switch.
 
+## DSP/domain gotchas (Chunk I: final integration of scale-inference,
+crosstalk-detection, spectrum view)
+
+- `src/app/bootstrap.ts` now also owns: (1) a scale auto-detection flow
+  (`startScaleDetection()`/`finishScaleDetection()`, backed by
+  `DetectScaleFromStrikes` — a *fresh instance* per detection session, not a
+  reused/reset one, since the capability exposes no reset method and
+  recreating it is simpler than adding one), (2) a throttled crosstalk check
+  (`CheckCrosstalk`, via `CROSSTALK_CHECK_INTERVAL_FRAMES = 15`), and (3) an
+  optional spectrum/equalizer panel (`SpectrumViewRenderer`, fed by
+  `FftSpectrumAnalyzer`).
+- `DetectScaleFromStrikes` (application layer) gained one small addition,
+  `getCollectedCount()` — a thin wrapper around
+  `StrikeCollector.getCollectedFrequencies().length` — purely for live "N
+  notes collected" UI feedback while a detection session is in progress. No
+  domain logic changed.
+- The crosstalk check runs its **own** FFT (`SpectrumAnalyzer.analyzeSpectrum`
+  inside `CheckCrosstalk.check()`) — separate from `FftPartialDetector`'s
+  internal one already run every tick by `analyzeToneField.analyze()`. Doing
+  that every frame would double the per-frame FFT cost for what's explicitly
+  a heuristic hint, so it's throttled to every 15 frames (~4/sec at 60fps).
+  The spectrum panel's own `analyzeSpectrum` call runs every tick *only*
+  while the panel is visible (`showSpectrum` flag) — no FFT cost paid when
+  it's hidden, and this is a genuinely independent FFT call from the
+  crosstalk one (not deduplicated/shared) since `CheckCrosstalk.check()`
+  computes its own spectrum internally and wasn't touched.
+  `microphoneSource.getFrame()` itself (a cheap buffer read, not the FFT) can
+  be called more than once per tick when both features are due in the same
+  frame — harmless, same buffer object, no extra mic I/O.
+- `SpectrumViewRenderer` is constructed lazily inside `setSpectrumVisible()`
+  (only on first `true`), same jsdom-compatibility reason as
+  `CanvasToneFieldRenderer` being constructed lazily inside `start()` — see
+  the doc comment on `bootstrap()`.
+- Crosstalk warning copy in `describeCrosstalkWarnings()` (bootstrap.ts) says
+  "Possible crosstalk from: …", never "detected" — matches the hedging
+  language `crosstalk-warning.ts` and `detect-crosstalk.ts` already commit to
+  for research doc §2.5's unresolved question.
+- New UI in `src/main.ts`: `#crosstalk-readout` (updated by bootstrap's tick
+  loop), a `#detect-scale-button`/`#scale-detection-readout` pair (button
+  toggles "Detect scale from strikes" ↔ "Finish detecting"; on finish, if the
+  result is a known scale it's selected in the existing `<select>`, if it's
+  the ad-hoc fallback a `Custom (detected)` option is added and selected),
+  and a `#spectrum-toggle` checkbox + `#spectrum-canvas` (hidden by default
+  via the `hidden` attribute, toggled alongside `setSpectrumVisible()`). The
+  detect-scale button starts `disabled` and is only enabled after `start()`
+  resolves — scale detection depends on the same live tick loop as the main
+  tuning view.
+
 ## PWA policy
 
 The service worker must only register in production. `vite-plugin-pwa`'s
@@ -233,17 +281,13 @@ causes confusing "my change isn't showing up" symptoms (seen in an earlier
 project). Don't flip this on
 without adding an explicit dev-mode `unregister()` fallback.
 
-**TODO (human/future chunk):** wire a dev-mode SW `unregister()` fallback
-into `src/main.ts` (guarded by `import.meta.env.DEV`, e.g. iterate
-`navigator.serviceWorker.getRegistrations()` and unregister each). This was
-called for in Chunk 9 but deliberately not implemented there — Chunk 9 was
-scoped to only touch `vite.config.ts`, `public/icons/**`, `index.html`, and
-`CLAUDE.md` (parallel-safety constraint with concurrent chunks touching
-`src/app/**`), so it could not touch `main.ts`. Purpose: clears a stale SW
-left in a browser profile from earlier manual testing, in case someone
-toggles `devOptions.enabled` to `true` for local debugging and forgets to
-flip it back — without this fallback that stale SW would keep serving a
-cached build indefinitely.
+The dev-mode `unregister()` fallback (deferred from Chunk 9, which couldn't
+touch `main.ts`) was added in Chunk I: `src/main.ts` guards
+`navigator.serviceWorker.getRegistrations().then(...)` behind both
+`import.meta.env.DEV` and `'serviceWorker' in navigator` — the latter check
+matters because jsdom's `navigator` has no `serviceWorker` property, so
+`main.spec.ts`'s `await import('./main')` needs it to stay a no-op under
+test rather than throwing.
 
 ## Icons (Chunk 9)
 
@@ -295,7 +339,12 @@ adaptive icon on Android, and offline behavior after first load.
 
 ## Delivery convention
 
-Build proceeds in 9 pre-approved chunks (see the plan file), each
-independently buildable/testable. Don't skip ahead into a later chunk's
-scope even if it looks convenient — the split exists to keep every commit
-in a verifiably working state.
+The MVP (see the plan file) shipped in 9 pre-approved chunks; a post-MVP
+plan (also in the same plan file, "Post-MVP chunk plan" section) added
+scale auto-detection, crosstalk warnings, and the spectrum view across
+parallel capability chunks (A/B/D/E/G) plus one final integration chunk
+(Chunk I, wiring all three into `src/app/**`/`src/main.ts`) — that
+integration is complete as of this writing. Each chunk is independently
+buildable/testable; don't skip ahead into a later chunk's scope even if it
+looks convenient — the split exists to keep every commit in a verifiably
+working state.

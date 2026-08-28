@@ -26,14 +26,30 @@ export class DetectScaleFromStrikes {
     this.strikeCollector.recordReading(hz)
   }
 
-  inferScale(candidates: readonly Scale[], referencePitchHz: number): InferredScale {
+  /** Number of distinct struck notes collected so far — for live UI feedback while a detection session is in progress. */
+  getCollectedCount(): number {
+    return this.strikeCollector.getCollectedFrequencies().length
+  }
+
+  inferScale(
+    candidates: readonly Scale[],
+    referencePitchHz: number,
+  ): InferredScale {
     const collectedHz = this.strikeCollector.getCollectedFrequencies()
     const matched = matchScale(collectedHz, candidates, referencePitchHz)
 
     if (matched !== null) {
-      return { scale: matched.scale, confidence: matched.confidence, isKnownScale: true }
+      return {
+        scale: matched.scale,
+        confidence: matched.confidence,
+        isKnownScale: true,
+      }
     }
 
-    return { scale: buildAdHocScale(collectedHz, referencePitchHz), confidence: 0, isKnownScale: false }
+    return {
+      scale: buildAdHocScale(collectedHz, referencePitchHz),
+      confidence: 0,
+      isKnownScale: false,
+    }
   }
 }
