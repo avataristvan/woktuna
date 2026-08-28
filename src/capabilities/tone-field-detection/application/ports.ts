@@ -28,3 +28,19 @@ export interface PartialDetectionResult {
 export interface PartialDetector {
   detectPartials(frame: Float32Array, sampleRate: number, fundamental: Frequency): PartialDetectionResult
 }
+
+export interface SpectrumReading {
+  readonly magnitudes: Float32Array
+  readonly binToHz: (bin: number) => number
+  readonly hzToBin: (hz: number) => number
+}
+
+/**
+ * Dependency-inversion boundary for whole-spectrum analysis, as opposed to
+ * `PartialDetector`'s band-limited peak search — for callers (a future
+ * crosstalk display or spectrum/equalizer view) that need the full
+ * magnitude spectrum rather than a specific partial's frequency.
+ */
+export interface SpectrumAnalyzer {
+  analyzeSpectrum(frame: Float32Array, sampleRate: number): SpectrumReading
+}
