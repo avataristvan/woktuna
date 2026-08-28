@@ -337,6 +337,38 @@ crosstalk-detection, spectrum view)
   asserting the constructor param and the runtime setter each actually
   change the detection outcome, not just that they're stored.
 
+## DSP/domain gotchas (sticky target-note lock — post-Chunk-I fix)
+
+- `SelectScale.nearestTargetFor()` (application/select-scale.ts) is no longer
+  stateless. Live-hardware testing showed the displayed target note could
+  jump to a different (usually lowest/Ding) note as a struck note decayed or
+  a neighboring tone field's resonance bled in — a single noisy frame's raw
+  `detectedHz` was enough to flip which note `nearestTarget()` resolved to,
+  since it used to be called fresh every rAF tick with no memory. `SelectScale`
+  now remembers the last resolved `{ note, targetHz }` as a lock; a
+  subsequent call only re-resolves via `nearestTarget()` if `detectedHz` is
+  more than `STICKY_LOCK_RELOCK_THRESHOLD_CENTS` (175, an unverified
+  heuristic — same tunable status as `fft-peak-picking.ts`'s
+  `DEFAULT_TOLERANCE_CENTS`, needs real-hardware validation) away from the
+  locked `targetHz`; otherwise it returns the locked note/targetHz with
+  `centDeviation` freshly recomputed against the live `detectedHz`, so the
+  reference note stays fixed but the tuning feedback keeps updating in real
+  time. This does **not** fix the underlying autocorrelation
+  octave/subharmonic misdetection that can produce a wrong `detectedHz` in
+  the first place (`autocorrelation.ts`) — that's a separate, not-yet-scoped
+  DSP concern; this chunk only mitigates the symptom at the
+  scale-configuration layer.
+- The lock is reset (next call resolves fresh) by both `setActiveScale()` and
+  `setReferencePitchHz()` — a lock resolved under the old scale or reference
+  pitch is meaningless once either changes. `bootstrap.ts` was not touched:
+  `tick()` still calls `nearestTargetFor()` fresh every frame with the same
+  signature/return type: the statefulness is fully internal to `SelectScale`.
+- `select-scale.spec.ts` (new) is this capability's first `application/`-layer
+  spec — previously only `domain/` and `infrastructure/dsp/` had co-located
+  tests per this repo's testing convention; stateful lock/relock/reset
+  behavior across sequential calls isn't expressible as a pure-function
+  domain test, so this is a deliberate, narrow exception.
+
 ## PWA policy
 
 The service worker must only register in production. `vite-plugin-pwa`'s
