@@ -16,7 +16,7 @@ import type { Scale } from '../domain/scale'
  * Do not rely on this data for actual tuning without the user verifying it
  * against a source they trust.
  */
-export const KNOWN_SCALES: Scale[] = [
+export const KNOWN_SCALES: readonly Scale[] = [
   {
     name: 'D Kurd',
     notes: ['D3', 'A3', 'A#3', 'C4', 'D4', 'E4', 'F4', 'G4', 'A4'],
@@ -29,4 +29,4 @@ export const KNOWN_SCALES: Scale[] = [
     name: 'C Pygmy',
     notes: ['C3', 'G3', 'A#3', 'C4', 'D4', 'F4', 'G4', 'A#4'],
   },
-]
+] as const

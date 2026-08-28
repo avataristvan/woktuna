@@ -43,4 +43,11 @@ describe('deviationToGuidance', () => {
   it('preserves the raw cent deviation on the radial signal', () => {
     expect(deviationToGuidance(-17.5).radial.centDeviation).toBe(-17.5)
   })
+
+  it('treats NaN as inTune rather than a confident significant/edge reading', () => {
+    const guidance = deviationToGuidance(NaN)
+
+    expect(guidance.radial.severity).toBe('inTune')
+    expect(guidance.hammerBias).toBe('inTune')
+  })
 })

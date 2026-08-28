@@ -31,6 +31,10 @@ export class CanvasToneFieldRenderer {
   private readonly context: CanvasRenderingContext2D
   private readonly resizeObserver: ResizeObserver
   private latestGuidance: ToneFieldGuidance | null = null
+  private dprMediaQuery: MediaQueryList | null = null
+  private readonly onDprChange = (): void => this.resizeToDisplaySize()
+  private cssWidth = 0
+  private cssHeight = 0
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -55,11 +59,29 @@ export class CanvasToneFieldRenderer {
 
   dispose(): void {
     this.resizeObserver.disconnect()
+    this.dprMediaQuery?.removeEventListener('change', this.onDprChange)
+  }
+
+  /**
+   * ResizeObserver only fires on element size changes — browser zoom or
+   * moving the window to a different-DPI monitor changes
+   * window.devicePixelRatio without resizing the canvas element, so it needs
+   * its own listener. A matchMedia query for the *current* dpr fires exactly
+   * once, when that value stops matching, so the listener is re-armed for
+   * the new dpr on every change.
+   */
+  private watchDevicePixelRatio(): void {
+    this.dprMediaQuery?.removeEventListener('change', this.onDprChange)
+    const dpr = window.devicePixelRatio || 1
+    this.dprMediaQuery = window.matchMedia(`(resolution: ${dpr}dppx)`)
+    this.dprMediaQuery.addEventListener('change', this.onDprChange)
   }
 
   private resizeToDisplaySize(): void {
     const dpr = window.devicePixelRatio || 1
     const { width: cssWidth, height: cssHeight } = this.canvas.getBoundingClientRect()
+    this.cssWidth = cssWidth
+    this.cssHeight = cssHeight
     const backingWidth = Math.max(1, Math.round(cssWidth * dpr))
     const backingHeight = Math.max(1, Math.round(cssHeight * dpr))
 
@@ -68,6 +90,7 @@ export class CanvasToneFieldRenderer {
       this.canvas.height = backingHeight
     }
     this.context.setTransform(dpr, 0, 0, dpr, 0, 0)
+    this.watchDevicePixelRatio()
 
     if (this.latestGuidance) {
       this.draw(this.latestGuidance)
@@ -75,7 +98,8 @@ export class CanvasToneFieldRenderer {
   }
 
   private draw(guidance: ToneFieldGuidance): void {
-    const { width: cssWidth, height: cssHeight } = this.canvas.getBoundingClientRect()
+    const cssWidth = this.cssWidth
+    const cssHeight = this.cssHeight
     const ctx = this.context
     ctx.clearRect(0, 0, cssWidth, cssHeight)
 

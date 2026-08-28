@@ -10,6 +10,7 @@ const SIGNIFICANT_THRESHOLD_CENTS = 30
 
 function centDeviationToSeverity(centDeviation: number): Severity {
   const magnitude = Math.abs(centDeviation)
+  if (Number.isNaN(magnitude)) return 'inTune'
   if (magnitude <= SLIGHT_THRESHOLD_CENTS) return 'inTune'
   if (magnitude <= MODERATE_THRESHOLD_CENTS) return 'slight'
   if (magnitude <= SIGNIFICANT_THRESHOLD_CENTS) return 'moderate'
@@ -37,6 +38,11 @@ function centDeviationToSeverity(centDeviation: number): Severity {
  * dot/crosshair — that would misrepresent an empirically fuzzy technique
  * (§5: no source has an exact, reproducible strike-path diagram) as more
  * precise than it is.
+ *
+ * This function assumes hammering from the outside/playing side of the
+ * shell. Per research doc §2.3, hammering from the inside through the Gu
+ * (sound hole) inverts the center/edge direction — that inversion is not
+ * implemented here; Chunk 8's `hammer-direction.ts` will handle it.
  */
 export function deviationToGuidance(fundamentalCentDeviation: number): ToneFieldGuidance {
   const severity = centDeviationToSeverity(fundamentalCentDeviation)

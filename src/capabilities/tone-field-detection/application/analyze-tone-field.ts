@@ -4,6 +4,13 @@ import type { AudioFrameSource, PitchDetector } from './ports'
 
 const DEFAULT_SMOOTHING_WINDOW = 5
 
+/**
+ * A raw reading further than this from the current running median is
+ * treated as a new strike (a new tone field), not an outlier of the current
+ * one — see the staleness-reset note on `analyze()`.
+ */
+const JUMP_RESET_THRESHOLD_CENTS = 100
+
 export class AnalyzeToneField {
   private readonly audioFrameSource: AudioFrameSource
   private readonly pitchDetector: PitchDetector
@@ -27,6 +34,13 @@ export class AnalyzeToneField {
    * window itself is left untouched so a later good reading isn't diluted by
    * a temporary dropout.
    *
+   * If the raw reading jumps more than JUMP_RESET_THRESHOLD_CENTS away from
+   * the current running median, the smoothing window is cleared and restarts
+   * from just this reading instead of blending it in — otherwise a median
+   * filter treats a freshly-struck (different) tone field's note as the
+   * "outlier" and keeps reporting the previous field's pitch for the next
+   * few frames.
+   *
    * octave/compoundFifth stay unpopulated on the returned ToneFieldReading
    * until Chunk 6 adds a PartialDetector (FFT peak-picking relative to this
    * fundamental) — intentionally omitted here rather than stubbed, so
@@ -38,6 +52,14 @@ export class AnalyzeToneField {
 
     if (detectedHz === null) {
       return null
+    }
+
+    if (this.recentFundamentalsHz.length > 0) {
+      const currentMedianHz = median(this.recentFundamentalsHz)
+      const jumpCents = Math.abs(1200 * Math.log2(detectedHz / currentMedianHz))
+      if (jumpCents > JUMP_RESET_THRESHOLD_CENTS) {
+        this.recentFundamentalsHz.length = 0
+      }
     }
 
     this.recentFundamentalsHz.push(detectedHz)

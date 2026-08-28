@@ -56,4 +56,54 @@ describe('detectPitchByAutocorrelation', () => {
 
     expect(detectPitchByAutocorrelation(frame, SAMPLE_RATE)).toBeNull()
   })
+
+  it('rejects low-frequency rumble instead of reporting it as the pitch', () => {
+    const length = Math.floor(SAMPLE_RATE * 0.5)
+    const frame = new Float32Array(length)
+    for (let i = 0; i < length; i++) {
+      const t = i / SAMPLE_RATE
+      // Mic-handling-noise-style rumble well below any handpan fundamental,
+      // added on top of a clean tone — should not pull the detected pitch
+      // toward the rumble frequency.
+      frame[i] = Math.sin(2 * Math.PI * 440 * t) + 0.6 * Math.sin(2 * Math.PI * 20 * t)
+    }
+
+    const detected = detectPitchByAutocorrelation(frame, SAMPLE_RATE)
+
+    expect(detected).not.toBeNull()
+    expect(Math.abs(centsOff(detected as number, 440))).toBeLessThan(10)
+  })
+
+  it('detects the fundamental of a multi-partial handpan-like signal, not the octave', () => {
+    const f0 = 220
+    const frame = sineWave(f0, SAMPLE_RATE, 0.5)
+    for (let i = 0; i < frame.length; i++) {
+      const t = i / SAMPLE_RATE
+      // Research doc §2.1: fundamental + octave + compound fifth ring
+      // together on a struck tone field.
+      frame[i] += 0.5 * Math.sin(2 * Math.PI * 2 * f0 * t) + 0.3 * Math.sin(2 * Math.PI * 3 * f0 * t)
+    }
+
+    const detected = detectPitchByAutocorrelation(frame, SAMPLE_RATE)
+
+    expect(detected).not.toBeNull()
+    expect(Math.abs(centsOff(detected as number, f0))).toBeLessThan(5)
+  })
+
+  it('stays within a rAF-safe time budget for a realistic frame size', () => {
+    const sampleRate = 44100
+    // Matches the full AnalyserNode frame length (see DEFAULT_FFT_SIZE in
+    // web-audio-microphone-source.ts) — the correlation window itself must
+    // stay capped regardless of how large this input frame is.
+    const frame = sineWave(220, sampleRate, 32768 / sampleRate)
+
+    const start = performance.now()
+    detectPitchByAutocorrelation(frame, sampleRate)
+    const elapsedMs = performance.now() - start
+
+    // Generous budget for a test environment (browser main thread has a
+    // 16.7ms rAF budget); this is here to catch a regression back to
+    // O(frameLength × lagRange), which measured ~158ms on this frame size.
+    expect(elapsedMs).toBeLessThan(50)
+  })
 })

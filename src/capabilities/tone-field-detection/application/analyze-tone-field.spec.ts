@@ -74,4 +74,19 @@ describe('AnalyzeToneField', () => {
     expect(droppedOut).toBeNull()
     expect(reading?.fundamental.frequency).toBe(440)
   })
+
+  it('tracks a jump to a newly-struck tone field immediately, not after several frames', () => {
+    // Median smoothing would otherwise treat the first 294Hz reading as an
+    // "outlier" against the still-440Hz-heavy window and keep reporting the
+    // previous field's pitch for a couple of frames.
+    const pitchDetector = new FakePitchDetector([440, 440, 440, 294])
+    const useCase = new AnalyzeToneField(new FakeAudioFrameSource(), pitchDetector, 5)
+
+    useCase.analyze()
+    useCase.analyze()
+    useCase.analyze()
+    const reading = useCase.analyze()
+
+    expect(reading?.fundamental.frequency).toBe(294)
+  })
 })
