@@ -51,6 +51,29 @@ describe('deviationToGuidance', () => {
     expect(guidance.hammerBias).toBe('inTune')
   })
 
+  describe('hammerMode', () => {
+    it('defaults to outside mode, matching pre-Chunk-8 behavior exactly', () => {
+      expect(deviationToGuidance(-10).hammerBias).toBe('center')
+      expect(deviationToGuidance(10).hammerBias).toBe('edge')
+      expect(deviationToGuidance(0).hammerBias).toBe('inTune')
+    })
+
+    it('preserves outside-mode bias when explicitly passed', () => {
+      expect(deviationToGuidance(-10, null, null, 'outside').hammerBias).toBe('center')
+      expect(deviationToGuidance(10, null, null, 'outside').hammerBias).toBe('edge')
+    })
+
+    it('inverts the bias in inside mode per §2.3', () => {
+      expect(deviationToGuidance(-10, null, null, 'inside').hammerBias).toBe('edge')
+      expect(deviationToGuidance(10, null, null, 'inside').hammerBias).toBe('center')
+    })
+
+    it('stays inTune in inside mode regardless of deviation sign within threshold', () => {
+      expect(deviationToGuidance(0, null, null, 'inside').hammerBias).toBe('inTune')
+      expect(deviationToGuidance(4, null, null, 'inside').hammerBias).toBe('inTune')
+    })
+  })
+
   describe('axis guidance', () => {
     it('leaves longAxis/shortAxis null when no octave/fifth deviation is given', () => {
       const guidance = deviationToGuidance(0)

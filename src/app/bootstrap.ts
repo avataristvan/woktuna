@@ -7,6 +7,7 @@ import { KNOWN_SCALES } from '../capabilities/scale-configuration/infrastructure
 import { CanvasToneFieldRenderer } from '../capabilities/tone-field-visualization/presentation/canvas-tone-field-renderer'
 import { buildGuidance } from '../capabilities/tone-field-visualization/application/build-guidance'
 import { AppState } from './app-state'
+import type { HammerMode } from './app-state'
 
 export interface ToneFieldUiElements {
   canvas: HTMLCanvasElement
@@ -16,6 +17,7 @@ export interface ToneFieldUiElements {
 export interface ToneFieldApp {
   start(): Promise<void>
   selectScale(scaleName: string): void
+  setHammerMode(mode: HammerMode): void
 }
 
 /**
@@ -43,7 +45,7 @@ export function bootstrap(elements: ToneFieldUiElements): ToneFieldApp {
     const reading = analyzeToneField.analyze()
     if (reading && renderer) {
       const target = selectScale.nearestTargetFor(reading.fundamental.frequency)
-      const guidance = buildGuidance(reading, target.targetHz)
+      const guidance = buildGuidance(reading, target.targetHz, appState.hammerMode)
       renderer.render(guidance)
       elements.noteReadout.textContent = `${target.note} — ${guidance.radial.centDeviation.toFixed(1)} cents`
     }
@@ -62,6 +64,10 @@ export function bootstrap(elements: ToneFieldUiElements): ToneFieldApp {
       if (!scale) return
       appState.activeScale = scale
       selectScale.setActiveScale(scale)
+    },
+
+    setHammerMode(mode: HammerMode) {
+      appState.setHammerMode(mode)
     },
   }
 }

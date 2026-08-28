@@ -197,6 +197,34 @@ and unverified — kept as an isolated, explicitly-flagged function
   partials are expected at fixed ratios above its own fundamental, not
   independent scale notes.
 
+## DSP/domain gotchas (Chunk 8: inside/outside hammer toggle)
+
+- `hammer-direction.ts` (new domain file) owns both the `HammerMode` type
+  (`'outside' | 'inside'`) and `resolveHammerBias(centDeviation, severity,
+  mode)`, which replaces `deviation-to-guidance.ts`'s old inline `< 0 ?
+  'center' : 'edge'` ternary. `deviationToGuidance` now takes a 4th optional
+  `hammerMode` param (default `'outside'`) and delegates the center/edge
+  decision to this function instead of deciding it itself.
+- `HammerMode` is defined in the domain layer (`hammer-direction.ts`), not
+  in `src/app/app-state.ts` — `app-state.ts` re-exports the type via
+  `export type { HammerMode }` rather than declaring its own. `app/` is the
+  outermost layer (composition root), so it importing a capability's domain
+  type is the correct direction; the reverse (domain importing from `app/`)
+  would not be.
+- The inside-mode inversion is **only** applied to the fundamental's
+  center/edge (`hammerBias`) — `longAxis`/`shortAxis` (octave/compound-fifth
+  axis markers) are untouched by hammer mode. Research doc §2.3 only claims
+  an inversion for center/edge hammering; it makes no axis-inversion claim,
+  so don't invent one.
+- `AppState.setHammerMode(mode)` is the setter; `bootstrap.ts`'s render loop
+  reads `appState.hammerMode` fresh every tick (not cached) and passes it as
+  `buildGuidance`'s 3rd arg, so the toggle takes effect on the very next
+  frame with no explicit re-render call needed.
+- UI toggle in `main.ts` is a `<fieldset class="hammer-mode">` with two
+  radio inputs (`name="hammer-mode"`, values `"outside"`/`"inside"`,
+  outside checked by default) — deliberately not a `<select>` like the
+  scale picker, since a binary either/or reads better as a two-way switch.
+
 ## PWA policy
 
 The service worker must only register in production. `vite-plugin-pwa`'s

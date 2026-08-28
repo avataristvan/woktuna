@@ -4,6 +4,7 @@ import { centsBetween } from '../../tone-field-detection/domain/tuning-rules'
 import { expectedPartialRatio } from '../../../shared-kernel/partial-kind'
 import { deviationToGuidance } from '../domain/deviation-to-guidance'
 import type { ToneFieldGuidance } from '../domain/guidance-model'
+import type { HammerMode } from '../domain/hammer-direction'
 
 /**
  * Composition-level use-case: resolves a struck tone field's fundamental,
@@ -25,7 +26,11 @@ import type { ToneFieldGuidance } from '../domain/guidance-model'
  * domains themselves stay decoupled from each other (see plan's capability
  * boundaries).
  */
-export function buildGuidance(reading: ToneFieldReading, targetHz: number): ToneFieldGuidance {
+export function buildGuidance(
+  reading: ToneFieldReading,
+  targetHz: number,
+  hammerMode: HammerMode = 'outside',
+): ToneFieldGuidance {
   const fundamentalDeviation = centsBetween(reading.fundamental.frequency, createFrequency(targetHz))
 
   const octaveDeviation = reading.octave
@@ -39,5 +44,5 @@ export function buildGuidance(reading: ToneFieldReading, targetHz: number): Tone
       )
     : null
 
-  return deviationToGuidance(fundamentalDeviation, octaveDeviation, compoundFifthDeviation)
+  return deviationToGuidance(fundamentalDeviation, octaveDeviation, compoundFifthDeviation, hammerMode)
 }
