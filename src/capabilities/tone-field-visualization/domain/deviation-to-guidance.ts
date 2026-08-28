@@ -1,6 +1,8 @@
 import type { Axis } from '../../../shared-kernel/partial-kind'
 import { axisForPartial } from '../../../shared-kernel/partial-kind'
 import type { AxisGuidance, Severity, ToneFieldGuidance } from './guidance-model'
+import type { HammerMode } from './hammer-direction'
+import { resolveHammerBias } from './hammer-direction'
 
 /**
  * Severity thresholds in absolute cents. Deliberately coarse — this is a
@@ -54,19 +56,20 @@ function toAxisGuidance(axis: Axis, centDeviation: number | null): AxisGuidance 
  * (§5: no source has an exact, reproducible strike-path diagram) as more
  * precise than it is.
  *
- * This function assumes hammering from the outside/playing side of the
- * shell. Per research doc §2.3, hammering from the inside through the Gu
- * (sound hole) inverts the center/edge direction — that inversion is not
- * implemented here; Chunk 8's `hammer-direction.ts` will handle it.
+ * `hammerMode` defaults to `'outside'` (the playing side) — the center/edge
+ * decision itself is delegated to `hammer-direction.ts`'s
+ * `resolveHammerBias`, which also implements research doc §2.3's
+ * (unverified) inside-hammering inversion. This function only computes the
+ * cent deviation and severity; it doesn't decide the direction itself.
  */
 export function deviationToGuidance(
   fundamentalCentDeviation: number,
   octaveCentDeviation: number | null = null,
   compoundFifthCentDeviation: number | null = null,
+  hammerMode: HammerMode = 'outside',
 ): ToneFieldGuidance {
   const severity = centDeviationToSeverity(fundamentalCentDeviation)
-  const hammerBias =
-    severity === 'inTune' ? 'inTune' : fundamentalCentDeviation < 0 ? 'center' : 'edge'
+  const hammerBias = resolveHammerBias(fundamentalCentDeviation, severity, hammerMode)
 
   return {
     radial: {

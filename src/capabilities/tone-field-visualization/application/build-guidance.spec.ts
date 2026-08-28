@@ -37,6 +37,17 @@ describe('buildGuidance', () => {
     expect(guidance.radial.centDeviation).toBeLessThan(0)
   })
 
+  describe('hammerMode', () => {
+    it('defaults to outside mode', () => {
+      expect(buildGuidance(readingAt(435), 440).hammerBias).toBe('center')
+    })
+
+    it('inverts the hammer bias when inside mode is passed through', () => {
+      expect(buildGuidance(readingAt(435), 440, 'inside').hammerBias).toBe('edge')
+      expect(buildGuidance(readingAt(450), 440, 'inside').hammerBias).toBe('center')
+    })
+  })
+
   describe('axis guidance from octave/compound-fifth partials', () => {
     it('leaves longAxis/shortAxis null when the reading has no octave/fifth partial', () => {
       const guidance = buildGuidance(readingAt(440), 440)
