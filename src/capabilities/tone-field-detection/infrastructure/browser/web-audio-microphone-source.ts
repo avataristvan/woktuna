@@ -1,13 +1,23 @@
 import type { AudioFrameSource } from '../../application/ports'
 
 /**
- * ~682ms window at 48kHz — the plan's MVP tradeoff (AnalyserNode + rAF
- * polling, not AudioWorklet) needs an analysis window this large for
- * adequate cent resolution at handpan fundamental ranges; that main-thread
- * cost is judged acceptable unless real-device profiling shows jank.
+ * ~341ms window at 48kHz. Halved from 32768 during the Chunk 6.5 review
+ * pass — autocorrelation.ts (~4.8ms) + fft-peak-picking.ts (~3ms at 32768)
+ * were together consuming roughly half the 16.7ms rAF frame budget on a
+ * desktop dev machine, with real mobile hardware unmeasured and plausibly
+ * 3-5x worse. Halving this constant roughly halves the FFT cost (measured
+ * ~2.9ms -> ~1.3ms) while leaving adequate cent resolution; verified safe
+ * against fft-peak-picking.ts's low-fundamental edge case (a ~110Hz
+ * fundamental — bottom of the handpan range — combined with this smaller
+ * window makes the tight fundamental-reference search band collapse to as
+ * few as 2 FFT bins, which the noise-floor check added in that same review
+ * pass had to be widened to tolerate) with a dedicated test in
+ * fft-peak-picking.spec.ts. 4096 was NOT verified safe and should not be
+ * assumed to be — re-check the low-fundamental edge case again before
+ * going any lower than this.
  * Must be a power of 2 in [32, 32768] per the Web Audio spec.
  */
-const DEFAULT_FFT_SIZE = 32768
+const DEFAULT_FFT_SIZE = 16384
 
 /**
  * Implements AudioFrameSource via getUserMedia + AudioContext + AnalyserNode.

@@ -74,31 +74,59 @@ and unverified — kept as an isolated, explicitly-flagged function
 ## DSP gotchas (Chunk 6: octave/compound-fifth FFT peak-picking)
 
 - `fft-peak-picking.ts` computes its own FFT over the full frame (up to
-  `DEFAULT_FFT_SIZE`=32768, truncated down to the largest power of 2 that
-  fits) — this is deliberately a *different* window than
-  `autocorrelation.ts`'s 4096-sample `CORRELATION_WINDOW_SAMPLES`. The large
-  window is exactly why that buffer is sized the way it is (see the Chunk
-  5.5 gotcha below); FFT bin resolution needs it, autocorrelation doesn't.
-  Don't let a future refactor try to make these two DSP files share one
-  window length.
+  `DEFAULT_FFT_SIZE` in `web-audio-microphone-source.ts`, truncated down to
+  the largest power of 2 that fits) — this is deliberately a *different*
+  window than `autocorrelation.ts`'s 4096-sample
+  `CORRELATION_WINDOW_SAMPLES`. The large window is exactly why that buffer
+  is sized the way it is (see the Chunk 5.5 gotcha below); FFT bin
+  resolution needs it, autocorrelation doesn't. Don't let a future refactor
+  try to make these two DSP files share one window length.
 - The octave/compound-fifth search-band tolerance (`DEFAULT_TOLERANCE_CENTS`
   in `fft-peak-picking.ts`, currently ±250 cents) is an explicit TODO/tunable,
   not a settled value — too narrow misses badly-detuned partials (the whole
   point of a *pre*-tuning app), too wide risks locking onto crosstalk from a
   neighboring tone field (research doc §2.5's open, unresolved question).
   Needs real-hardware validation before treating as final.
-- A candidate peak only counts as "found" if it's a local maximum within its
-  search band AND at least `MIN_PARTIAL_TO_FUNDAMENTAL_RATIO` (5%) of the
-  fundamental's own peak magnitude — this is what lets a missing partial
-  return `null` instead of a false positive from window-leakage noise.
-  Global-magnitude/median-based noise floors don't work here (the floor is
-  near-zero across most of a mostly-silent synthetic spectrum, so leakage
-  tails from a real neighboring peak can still clear it) — the fundamental's
-  own magnitude is the only reliable per-frame reference.
 - `AnalyzeToneField`'s constructor takes an `AnalyzeToneFieldOptions` object
   now (`{ smoothingWindow?, partialDetector? }`), not a positional
   `smoothingWindow` third argument — this changed in Chunk 6 when a fourth
   dependency (`PartialDetector`) was added.
+
+## DSP gotchas (Chunk 6.5: review fix pass on Chunk 6's peak-picking)
+
+- The peak-vs-noise gate in `fft-peak-picking.ts` was redesigned. The old
+  design (a bare `referenceMagnitude <= 0` check, plus requiring a candidate
+  ≥5% of the fundamental's own magnitude) had two real bugs: the `<= 0`
+  check was dead code (`Math.hypot` over FFT bins is essentially never
+  exactly zero for real/noisy input, only for literal silence), so a
+  pure-noise frame with no tone at all sailed through and produced confident
+  false-positive octave/fifth readings; and the 5% ratio caused false
+  negatives on real quiet partials, contradicting the domain doc's own
+  description of tapping an axis specifically *to isolate* a partial that
+  usually is not comparable in magnitude to the fundamental
+  (`handpan-stimm-app-recherche.md` §2.1).
+- The new primary discriminator is `isGenuineSpectralPeak` +
+  `localNoiseFloor`: a candidate's winning bin must be a local maximum AND
+  clear `NOISE_FLOOR_MARGIN` (6x) times the median magnitude of bins just
+  outside its own search band (`FLOOR_SAMPLE_EXTRA_BINS`=6 bins beyond the
+  band edges — deliberately excludes the *entire* band, not just the
+  winning bin, because a narrow band like the ±50-cent fundamental
+  reference can be entirely occupied by one real peak's Hann main lobe).
+  `MIN_PARTIAL_TO_FUNDAMENTAL_RATIO` still exists but is now a low secondary
+  sanity floor (2%), not the primary gate. A global/spectrum-wide noise
+  floor was tried in Chunk 6 and rejected (see git history) — still
+  rejected here for the same reason: most of a mostly-silent synthetic
+  spectrum sits at exactly zero, so it clears trivially. A literally-silent
+  frame (all-zero magnitude) needs its own explicit `peakMag <= 0` guard
+  before the margin check, since `0 >= margin * 0` is trivially true.
+- `DEFAULT_FFT_SIZE` in `web-audio-microphone-source.ts` was halved from
+  32768 to 16384 (measured ~2.9ms → ~1.3ms per `fft-peak-picking.ts` call)
+  as a safety margin against the combined autocorrelation+FFT cost eating
+  the 16.7ms rAF budget on real (unmeasured) mobile hardware. Verified safe
+  against the low-fundamental edge case (a ~110Hz fundamental with a 16384
+  window makes the ±50-cent reference band collapse to as few as 2 bins) via
+  a dedicated test in `fft-peak-picking.spec.ts`. **4096 was NOT verified
+  safe** — do not assume it is without re-running that same edge-case check.
 
 ## DSP gotchas (Chunk 5.5 fix pass)
 
