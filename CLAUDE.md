@@ -69,6 +69,28 @@ and unverified — kept as an isolated, explicitly-flagged function
   strike-path diagram (research doc §5) — the whole detection pipeline needs
   real-hardware validation before being trusted for actual tuning.
 
+## DSP gotchas (Chunk 5.5 fix pass)
+
+- `autocorrelation.ts`'s correlation window (`CORRELATION_WINDOW_SAMPLES`,
+  currently 4096) is deliberately decoupled from the full AnalyserNode frame
+  length (`DEFAULT_FFT_SIZE`, 32768 in `web-audio-microphone-source.ts`).
+  The larger buffer exists for Chunk 6's FFT bin resolution, not for
+  autocorrelation accuracy — accuracy there comes from parabolic
+  interpolation on the winning lag, not window length. Don't let Chunk 6
+  quietly widen the correlation window back to the full frame length; that
+  reintroduces a ~9x rAF-budget overrun (measured ~158ms/frame at 32768
+  samples vs. ~5.7ms at 4096).
+- The same file applies DC-removal + a one-pole ~60Hz high-pass
+  (`removeDcAndRumble`) before correlating. Any Chunk 6 refactor of this
+  function must keep that preprocessing (or move it somewhere still applied
+  before every correlation), otherwise low-frequency rumble goes back to
+  producing a confidently wrong pitch instead of a null.
+- `canvas-tone-field-renderer.ts` needs both a `ResizeObserver` (element
+  size changes) and a self-re-arming `matchMedia((resolution: ${dpr}dppx))`
+  listener (browser zoom / different-DPI monitor, which don't resize the
+  element) to stay correctly scaled — both must be disconnected in
+  `dispose()`.
+
 ## PWA policy
 
 The service worker must only register in production. `vite-plugin-pwa`'s
