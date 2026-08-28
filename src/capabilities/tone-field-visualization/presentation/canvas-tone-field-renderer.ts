@@ -11,11 +11,25 @@ const OUTLINE_WIDTH = 2
 const CENTER_ZONE_RADIUS_RATIO = 0.32
 const EDGE_ZONE_INNER_RADIUS_RATIO = 0.8
 
+// Deliberately smaller than CENTER_ZONE_RADIUS_RATIO and drawn fully opaque
+// (not the translucent hammer-bias fill) so "in tune, no more hammering
+// needed" reads unmistakably differently from "hammer toward center" —
+// see drawInTuneIndicator.
+const IN_TUNE_INDICATOR_RADIUS_RATIO = 0.12
+
 // Angular half-width (radians) of an axis marker arc, drawn at each end of
 // the axis to represent the "several distributed blows" pattern from
 // research doc §2.4 rather than a single strike point.
 const AXIS_MARKER_HALF_ANGLE = Math.PI / 7
 const AXIS_MARKER_WIDTH = 10
+
+// Font size for the "+"/"-" direction glyph, relative to the oval's short
+// radius. The edge-band glyph sits at this angle (45°, diagonal) rather than
+// a cardinal direction so it never overlaps the axis marker arcs, which are
+// centered on the cardinal angles (0/π for long axis, π/2/3π/2 for short).
+const DIRECTION_MARKER_FONT_RATIO = 0.45
+const EDGE_DIRECTION_MARKER_ANGLE = -Math.PI / 4
+const EDGE_DIRECTION_MARKER_RADIUS_RATIO = 0.85
 
 /**
  * Renders a `ToneFieldGuidance` onto a canvas as an oval tone-field graphic:
@@ -144,7 +158,10 @@ export class CanvasToneFieldRenderer {
     radiusY: number,
     guidance: ToneFieldGuidance,
   ): void {
-    if (guidance.hammerBias === 'inTune') return
+    if (guidance.hammerBias === 'inTune') {
+      this.drawInTuneIndicator(ctx, centerX, centerY, radiusX, radiusY)
+      return
+    }
 
     const color = severityToColor(guidance.radial.severity)
     ctx.save()
@@ -179,6 +196,79 @@ export class CanvasToneFieldRenderer {
       ctx.fill('evenodd')
     }
 
+    ctx.restore()
+
+    this.drawDirectionMarker(ctx, centerX, centerY, radiusX, radiusY, guidance.hammerBias, color)
+  }
+
+  /**
+   * Draws a "+"/"-" glyph marking whether the fundamental currently reads
+   * sharp (too high) or flat (too low). Per deviation-to-guidance.ts's §2.2
+   * mapping, hitting the center raises a flat note and hitting the edge
+   * lowers a sharp one, so the hammer-bias zone doubles as the direction:
+   * `center` means "currently flat" ("-"), `edge` means "currently sharp"
+   * ("+"). Drawn at full opacity with a dark outline (independent of the
+   * zone fill's 0.35 alpha) so it stays legible against the translucent
+   * fill.
+   */
+  private drawDirectionMarker(
+    ctx: CanvasRenderingContext2D,
+    centerX: number,
+    centerY: number,
+    radiusX: number,
+    radiusY: number,
+    hammerBias: 'center' | 'edge',
+    color: string,
+  ): void {
+    const symbol = hammerBias === 'center' ? '-' : '+'
+    const [markerX, markerY] =
+      hammerBias === 'center'
+        ? [centerX, centerY]
+        : [
+            centerX + radiusX * EDGE_DIRECTION_MARKER_RADIUS_RATIO * Math.cos(EDGE_DIRECTION_MARKER_ANGLE),
+            centerY + radiusY * EDGE_DIRECTION_MARKER_RADIUS_RATIO * Math.sin(EDGE_DIRECTION_MARKER_ANGLE),
+          ]
+    const fontSize = Math.round(radiusY * DIRECTION_MARKER_FONT_RATIO)
+
+    ctx.save()
+    ctx.font = `bold ${fontSize}px sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.lineWidth = Math.max(2, fontSize * 0.12)
+    ctx.strokeStyle = '#000000'
+    ctx.strokeText(symbol, markerX, markerY)
+    ctx.fillStyle = color
+    ctx.fillText(symbol, markerX, markerY)
+    ctx.restore()
+  }
+
+  /**
+   * Draws the "in tune, no more hammering needed" indicator: a small, fully
+   * opaque dot — deliberately smaller and solid (not the translucent
+   * CENTER_ZONE_RADIUS_RATIO fill used for "hit center") so it reads as
+   * "done" rather than as a hammering instruction, and never gets a +/-
+   * direction glyph since neither "too high" nor "too low" applies here.
+   */
+  private drawInTuneIndicator(
+    ctx: CanvasRenderingContext2D,
+    centerX: number,
+    centerY: number,
+    radiusX: number,
+    radiusY: number,
+  ): void {
+    ctx.save()
+    ctx.fillStyle = severityToColor('inTune')
+    ctx.beginPath()
+    ctx.ellipse(
+      centerX,
+      centerY,
+      radiusX * IN_TUNE_INDICATOR_RADIUS_RATIO,
+      radiusY * IN_TUNE_INDICATOR_RADIUS_RATIO,
+      0,
+      0,
+      Math.PI * 2,
+    )
+    ctx.fill()
     ctx.restore()
   }
 
