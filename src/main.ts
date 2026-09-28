@@ -164,6 +164,7 @@ startButton.addEventListener('click', () => {
       const message = error instanceof Error ? error.message : String(error)
       errorText.textContent = `Microphone access failed: ${message}`
       errorText.hidden = false
+      statusText.textContent = 'Could not start'
       startButton.textContent = 'Try again'
       startButton.disabled = false
     })
