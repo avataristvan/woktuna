@@ -183,7 +183,7 @@ export class CanvasToneFieldRenderer {
 
     const color = severityToColor(guidance.radial.severity)
     ctx.save()
-    ctx.globalAlpha = 0.35
+    ctx.globalAlpha *= 0.35
     ctx.fillStyle = color
 
     if (guidance.hammerBias === 'center') {
