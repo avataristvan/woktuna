@@ -1,4 +1,5 @@
 import type { AxisGuidance, ToneFieldGuidance } from '../domain/guidance-model'
+import { deviationDirection } from '../domain/partial-meter'
 import { severityToColor } from './color-scale'
 
 const OUTLINE_COLOR = '#888888'
@@ -31,6 +32,18 @@ const DIRECTION_MARKER_FONT_RATIO = 0.45
 const EDGE_DIRECTION_MARKER_ANGLE = -Math.PI / 4
 const EDGE_DIRECTION_MARKER_RADIUS_RATIO = 0.85
 
+// Axis glyphs sit just inside the oval at each axis end, inside the arc's
+// inner edge and clear of the 45° fundamental glyph.
+const AXIS_DIRECTION_MARKER_FONT_RATIO = 0.28
+const LONG_AXIS_GLYPH_RADIUS_RATIO = 0.78
+const SHORT_AXIS_GLYPH_RADIUS_RATIO = 0.7
+
+const STALE_ALPHA = 0.45
+
+export interface RenderOptions {
+  stale?: boolean
+}
+
 /**
  * Renders a `ToneFieldGuidance` onto a canvas as an oval tone-field graphic:
  * a radial zone hinting center-vs-edge hammer bias for the fundamental, and
@@ -45,6 +58,7 @@ export class CanvasToneFieldRenderer {
   private readonly context: CanvasRenderingContext2D
   private readonly resizeObserver: ResizeObserver
   private latestGuidance: ToneFieldGuidance | null = null
+  private latestStale = false
   private dprMediaQuery: MediaQueryList | null = null
   private readonly onDprChange = (): void => this.resizeToDisplaySize()
   private cssWidth = 0
@@ -66,9 +80,10 @@ export class CanvasToneFieldRenderer {
     this.resizeToDisplaySize()
   }
 
-  render(guidance: ToneFieldGuidance): void {
+  render(guidance: ToneFieldGuidance, options?: RenderOptions): void {
     this.latestGuidance = guidance
-    this.draw(guidance)
+    this.latestStale = options?.stale ?? false
+    this.draw(guidance, this.latestStale)
   }
 
   dispose(): void {
@@ -107,11 +122,11 @@ export class CanvasToneFieldRenderer {
     this.watchDevicePixelRatio()
 
     if (this.latestGuidance) {
-      this.draw(this.latestGuidance)
+      this.draw(this.latestGuidance, this.latestStale)
     }
   }
 
-  private draw(guidance: ToneFieldGuidance): void {
+  private draw(guidance: ToneFieldGuidance, stale: boolean): void {
     const cssWidth = this.cssWidth
     const cssHeight = this.cssHeight
     const ctx = this.context
@@ -125,10 +140,13 @@ export class CanvasToneFieldRenderer {
     const radiusX = Math.min(cssWidth, cssHeight * 1.6) * 0.42
     const radiusY = radiusX * 0.62
 
+    ctx.save()
+    if (stale) ctx.globalAlpha = STALE_ALPHA
     this.drawOvalOutline(ctx, centerX, centerY, radiusX, radiusY)
     this.drawRadialZone(ctx, centerX, centerY, radiusX, radiusY, guidance)
     this.drawAxisMarker(ctx, centerX, centerY, radiusX, radiusY, 'long', guidance.longAxis)
     this.drawAxisMarker(ctx, centerX, centerY, radiusX, radiusY, 'short', guidance.shortAxis)
+    ctx.restore()
   }
 
   private drawOvalOutline(
@@ -165,7 +183,7 @@ export class CanvasToneFieldRenderer {
 
     const color = severityToColor(guidance.radial.severity)
     ctx.save()
-    ctx.globalAlpha = 0.35
+    ctx.globalAlpha *= 0.35
     ctx.fillStyle = color
 
     if (guidance.hammerBias === 'center') {
@@ -198,18 +216,26 @@ export class CanvasToneFieldRenderer {
 
     ctx.restore()
 
-    this.drawDirectionMarker(ctx, centerX, centerY, radiusX, radiusY, guidance.hammerBias, color)
+    this.drawDirectionMarker(
+      ctx,
+      centerX,
+      centerY,
+      radiusX,
+      radiusY,
+      guidance.hammerBias,
+      deviationDirection(guidance.radial.centDeviation, guidance.radial.severity),
+      color,
+    )
   }
 
   /**
-   * Draws a "+"/"-" glyph marking whether the fundamental currently reads
-   * sharp (too high) or flat (too low). Per deviation-to-guidance.ts's §2.2
-   * mapping, hitting the center raises a flat note and hitting the edge
-   * lowers a sharp one, so the hammer-bias zone doubles as the direction:
-   * `center` means "currently flat" ("-"), `edge` means "currently sharp"
-   * ("+"). Drawn at full opacity with a dark outline (independent of the
-   * zone fill's 0.35 alpha) so it stays legible against the translucent
-   * fill.
+   * Draws a "+"/"-" glyph for the fundamental. Two independent facts are
+   * encoded: POSITION is where to hammer (`hammerBias`, center vs edge —
+   * mode-dependent, inverted in inside hammer mode), while the GLYPH is the
+   * pitch direction (sign of the cent deviation, "+" sharp / "-" flat —
+   * mode-independent). Drawn at full opacity with a dark outline
+   * (independent of the zone fill's 0.35 alpha) so it stays legible against
+   * the translucent fill.
    */
   private drawDirectionMarker(
     ctx: CanvasRenderingContext2D,
@@ -218,9 +244,11 @@ export class CanvasToneFieldRenderer {
     radiusX: number,
     radiusY: number,
     hammerBias: 'center' | 'edge',
+    direction: 'low' | 'high' | 'inTune',
     color: string,
   ): void {
-    const symbol = hammerBias === 'center' ? '-' : '+'
+    if (direction === 'inTune') return
+    const symbol = direction === 'high' ? '+' : '-'
     const [markerX, markerY] =
       hammerBias === 'center'
         ? [centerX, centerY]
@@ -310,6 +338,30 @@ export class CanvasToneFieldRenderer {
       ctx.stroke()
     }
 
+    ctx.restore()
+
+    const direction = deviationDirection(axisGuidance.centDeviation, axisGuidance.severity)
+    if (direction === 'inTune') return
+    const symbol = direction === 'high' ? '+' : '-'
+    const fontSize = Math.round(radiusY * AXIS_DIRECTION_MARKER_FONT_RATIO)
+    const offsets =
+      axis === 'long'
+        ? [radiusX * LONG_AXIS_GLYPH_RADIUS_RATIO, 0]
+        : [0, radiusY * SHORT_AXIS_GLYPH_RADIUS_RATIO]
+
+    ctx.save()
+    ctx.font = `bold ${fontSize}px sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.lineWidth = Math.max(2, fontSize * 0.12)
+    for (const sign of [1, -1]) {
+      const x = centerX + sign * offsets[0]
+      const y = centerY + sign * offsets[1]
+      ctx.strokeStyle = '#000000'
+      ctx.strokeText(symbol, x, y)
+      ctx.fillStyle = color
+      ctx.fillText(symbol, x, y)
+    }
     ctx.restore()
   }
 }
