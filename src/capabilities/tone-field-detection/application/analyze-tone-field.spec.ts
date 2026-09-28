@@ -147,6 +147,7 @@ describe('AnalyzeToneField', () => {
     expect(reading?.octave).toEqual({ kind: 'octave', frequency: createFrequency(880) })
     expect(reading?.compoundFifth).toBeUndefined()
   })
+
   describe('partial smoothing and hold', () => {
     const found = (octaveHz: number | null): PartialDetectionResult => ({
       octave: octaveHz === null ? null : createFrequency(octaveHz),
@@ -224,6 +225,16 @@ describe('AnalyzeToneField', () => {
       useCase.analyze()
 
       expect(useCase.analyze()?.octave?.frequency).toBe(1320)
+    })
+
+    it('discards a stale window when the same note is re-struck after silence', () => {
+      const { useCase, advance } = setup([440, 440, 440], [found(880), found(880), found(900)])
+
+      useCase.analyze()
+      useCase.analyze()
+      advance(1000)
+
+      expect(useCase.analyze()?.octave?.frequency).toBe(900)
     })
 
     it('honours a custom partialHoldMs', () => {

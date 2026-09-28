@@ -89,8 +89,9 @@ export class AnalyzeToneField {
    * undefined (no reading, never a fabricated value). Partial state is reset
    * when the fundamental jump-reset fires (new strike) and when a partial's
    * own raw value jumps away from its median. Null-fundamental (silence)
-   * frames do not touch partial state: the hold timing already bounds
-   * staleness, and analyze() returns null for those frames anyway.
+   * frames do not touch partial state; a window older than `partialHoldMs`
+   * is discarded when the next valid value arrives, so a re-strike after
+   * silence never blends with the previous strike's values.
    */
   analyze(): ToneFieldReading | null {
     const frame = this.audioFrameSource.getFrame()
@@ -143,7 +144,8 @@ export class AnalyzeToneField {
       return undefined
     }
 
-    if (state.recentHz.length > 0 && isJump(rawHz, median(state.recentHz))) {
+    const holdExpired = state.lastValidAtMs !== null && nowMs - state.lastValidAtMs > this.partialHoldMs
+    if (holdExpired || (state.recentHz.length > 0 && isJump(rawHz, median(state.recentHz)))) {
       state.recentHz.length = 0
     }
     state.recentHz.push(rawHz)
