@@ -12,7 +12,7 @@ const SLIGHT_THRESHOLD_CENTS = 5
 const MODERATE_THRESHOLD_CENTS = 15
 const SIGNIFICANT_THRESHOLD_CENTS = 30
 
-function centDeviationToSeverity(centDeviation: number): Severity {
+export function centDeviationToSeverity(centDeviation: number): Severity {
   const magnitude = Math.abs(centDeviation)
   if (Number.isNaN(magnitude)) return 'inTune'
   if (magnitude <= SLIGHT_THRESHOLD_CENTS) return 'inTune'
