@@ -8,14 +8,25 @@ import { CanvasToneFieldRenderer } from '../capabilities/tone-field-visualizatio
 import { SpectrumViewRenderer } from '../capabilities/tone-field-visualization/presentation/spectrum-view-renderer'
 import { barsFromSpectrum } from '../capabilities/tone-field-visualization/domain/spectrum-to-bars'
 import { buildGuidance } from '../capabilities/tone-field-visualization/application/build-guidance'
+import { buildTunerPanel } from '../capabilities/tone-field-visualization/domain/partial-meter'
+import { TunerPanelView } from '../capabilities/tone-field-visualization/presentation/tuner-panel-view'
 import { AppState } from './app-state'
 import type { HammerMode } from './app-state'
 
 export interface ToneFieldUiElements {
   canvas: HTMLCanvasElement
-  noteReadout: HTMLElement
+  noteName: HTMLElement
+  statusText: HTMLElement
+  tunerPanelContainer: HTMLElement
   spectrumCanvas: HTMLCanvasElement
 }
+
+// A partial hold (400 ms, AnalyzeToneField) is intentionally longer than this:
+// the dimmed "silence" state only appears once the held partials have lapsed too.
+const STALE_AFTER_MS = 300
+const NO_NOTE_TEXT = '—'
+
+type Guidance = ReturnType<typeof buildGuidance>
 
 export interface ToneFieldApp {
   start(): Promise<void>
@@ -50,7 +61,12 @@ export function bootstrap(elements: ToneFieldUiElements): ToneFieldApp {
   )
   const spectrumAnalyzer = new FftSpectrumAnalyzer()
 
+  // Pure DOM (jsdom-safe), so built eagerly: initial "—" rows show before start.
+  const tunerPanelView = new TunerPanelView(elements.tunerPanelContainer)
   let renderer: CanvasToneFieldRenderer | null = null
+  let lastGuidance: Guidance | null = null
+  let lastReadingAtMs = 0
+  let showingStale = false
   let spectrumRenderer: SpectrumViewRenderer | null = null
   let showSpectrum = false
 
@@ -64,8 +80,24 @@ export function bootstrap(elements: ToneFieldUiElements): ToneFieldApp {
         target.targetHz,
         appState.hammerMode,
       )
-      renderer.render(guidance)
-      elements.noteReadout.textContent = `${target.note} — ${guidance.radial.centDeviation.toFixed(1)} cents`
+      tunerPanelView.render(buildTunerPanel(guidance), { stale: false })
+      renderer.render(guidance, { stale: false })
+      elements.noteName.textContent = target.note
+      elements.statusText.textContent = ''
+      lastGuidance = guidance
+      lastReadingAtMs = performance.now()
+      showingStale = false
+    } else if (
+      !reading &&
+      renderer &&
+      lastGuidance &&
+      !showingStale &&
+      performance.now() - lastReadingAtMs > STALE_AFTER_MS
+    ) {
+      tunerPanelView.render(buildTunerPanel(lastGuidance), { stale: true })
+      renderer.render(lastGuidance, { stale: true })
+      elements.statusText.textContent = 'Listening…'
+      showingStale = true
     }
 
     if (showSpectrum && spectrumRenderer) {
@@ -84,6 +116,9 @@ export function bootstrap(elements: ToneFieldUiElements): ToneFieldApp {
     async start() {
       await microphoneSource.start()
       renderer = new CanvasToneFieldRenderer(elements.canvas)
+      elements.noteName.textContent = NO_NOTE_TEXT
+      elements.statusText.textContent = 'Play a note'
+      tunerPanelView.render(null, { stale: false })
       requestAnimationFrame(tick)
     },
 

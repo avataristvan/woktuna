@@ -408,6 +408,26 @@ crosstalk-detection, spectrum view)
   behavior across sequential calls isn't expressible as a pure-function
   domain test, so this is a deliberate, narrow exception.
 
+## UI (tuner panel, settings, silence state)
+
+- `<main>` order: header, `#status-text` (role=status, aria-live) + `#note-name`
+  + `#error-text` (role=alert, hidden until a start failure), `#start-button`
+  (only primary button; hidden after successful start, relabelled "Try again"
+  on failure), `#tuner-panel` (`TunerPanelView`, built eagerly in
+  `bootstrap()`), `#tone-field-canvas`, then `<details class="settings">`
+  holding reference pitch, tolerance, hammer-mode radios and the spectrum
+  toggle/canvas (all ids/validation/revert-on-invalid unchanged).
+- Silence rule (`bootstrap.ts` tick): `analyze()` null for > 300 ms
+  (`STALE_AFTER_MS`) after the last reading re-renders the last guidance with
+  `stale: true` (dimmed) and status "Listening…", once (`showingStale` flag,
+  not per frame). Never fabricated zeros. Before the first reading: "Play a
+  note", "—" rows. The 400 ms partial hold in `AnalyzeToneField` is
+  deliberately longer than 300 ms.
+- Direction glyph derives from the cent-deviation sign, not `hammerBias`
+  (Chunk 3a fix) — hammer mode must not flip it.
+- `ToneFieldUiElements` is `{ canvas, noteName, statusText, tunerPanelContainer,
+  spectrumCanvas }`; `noteReadout` no longer exists.
+
 ## PWA policy
 
 The service worker must only register in production. `vite-plugin-pwa`'s

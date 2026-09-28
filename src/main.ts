@@ -18,63 +18,70 @@ if (import.meta.env.DEV && 'serviceWorker' in navigator) {
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <main>
-    <h1>WokTuna</h1>
-    <p class="subtitle">Handpan tuning guidance</p>
-    <div class="controls">
-      <button id="start-button" type="button">Start tuning</button>
-    </div>
-    <div class="controls">
-      <label for="reference-pitch-input">Reference pitch (Hz)</label>
-      <input
-        type="number"
-        id="reference-pitch-input"
-        list="reference-pitch-presets"
-        value="440"
-        min="400"
-        max="480"
-        step="0.1"
-      />
-      <datalist id="reference-pitch-presets">
-        <option value="440"></option>
-        <option value="442"></option>
-        <option value="443"></option>
-      </datalist>
-    </div>
-    <div class="controls">
-      <label for="tolerance-cents-input">Partial search tolerance (cents)</label>
-      <input
-        type="number"
-        id="tolerance-cents-input"
-        list="tolerance-cents-presets"
-        value="250"
-        min="50"
-        max="500"
-        step="1"
-      />
-      <datalist id="tolerance-cents-presets">
-        <option value="150"></option>
-        <option value="250"></option>
-        <option value="350"></option>
-      </datalist>
-    </div>
-    <fieldset class="hammer-mode">
-      <legend>Hammering from</legend>
-      <label><input type="radio" name="hammer-mode" value="outside" checked /> Outside</label>
-      <label><input type="radio" name="hammer-mode" value="inside" /> Inside</label>
-    </fieldset>
+    <header class="app-header"><h1>WokTuna</h1></header>
+    <section class="status-area">
+      <p id="status-text" role="status" aria-live="polite">Tap Start, then allow microphone access</p>
+      <p id="note-name">—</p>
+      <p id="error-text" role="alert" hidden></p>
+    </section>
+    <button id="start-button" type="button" class="primary">Start</button>
+    <div id="tuner-panel"></div>
     <canvas id="tone-field-canvas"></canvas>
-    <p id="readout">Press "Start tuning" and allow microphone access.</p>
-
-    <div class="spectrum-panel">
-      <label><input type="checkbox" id="spectrum-toggle" /> Show spectrum</label>
-      <canvas id="spectrum-canvas" hidden></canvas>
-    </div>
+    <details class="settings">
+      <summary>Settings</summary>
+      <div class="controls">
+        <label for="reference-pitch-input">Reference pitch (Hz)</label>
+        <input
+          type="number"
+          id="reference-pitch-input"
+          list="reference-pitch-presets"
+          value="440"
+          min="400"
+          max="480"
+          step="0.1"
+        />
+        <datalist id="reference-pitch-presets">
+          <option value="440"></option>
+          <option value="442"></option>
+          <option value="443"></option>
+        </datalist>
+      </div>
+      <div class="controls">
+        <label for="tolerance-cents-input">Partial search tolerance (cents)</label>
+        <input
+          type="number"
+          id="tolerance-cents-input"
+          list="tolerance-cents-presets"
+          value="250"
+          min="50"
+          max="500"
+          step="1"
+        />
+        <datalist id="tolerance-cents-presets">
+          <option value="150"></option>
+          <option value="250"></option>
+          <option value="350"></option>
+        </datalist>
+      </div>
+      <fieldset class="hammer-mode">
+        <legend>Hammering from</legend>
+        <label><input type="radio" name="hammer-mode" value="outside" checked /> Outside</label>
+        <label><input type="radio" name="hammer-mode" value="inside" /> Inside</label>
+      </fieldset>
+      <div class="spectrum-panel">
+        <label><input type="checkbox" id="spectrum-toggle" /> Show spectrum</label>
+        <canvas id="spectrum-canvas" hidden></canvas>
+      </div>
+    </details>
   </main>
 `
 
 const startButton = document.querySelector<HTMLButtonElement>('#start-button')!
 const canvas = document.querySelector<HTMLCanvasElement>('#tone-field-canvas')!
-const readout = document.querySelector<HTMLParagraphElement>('#readout')!
+const statusText = document.querySelector<HTMLElement>('#status-text')!
+const noteName = document.querySelector<HTMLElement>('#note-name')!
+const errorText = document.querySelector<HTMLElement>('#error-text')!
+const tunerPanelContainer = document.querySelector<HTMLElement>('#tuner-panel')!
 const hammerModeInputs = document.querySelectorAll<HTMLInputElement>(
   'input[name="hammer-mode"]',
 )
@@ -91,7 +98,9 @@ const toleranceCentsInput = document.querySelector<HTMLInputElement>(
 
 const app = bootstrap({
   canvas,
-  noteReadout: readout,
+  noteName,
+  statusText,
+  tunerPanelContainer,
   spectrumCanvas,
 })
 
@@ -145,11 +154,20 @@ for (const input of hammerModeInputs) {
 
 startButton.addEventListener('click', () => {
   startButton.disabled = true
-  app.start().catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error)
-    readout.textContent = `Microphone access failed: ${message}`
-    startButton.disabled = false
-  })
+  errorText.hidden = true
+  app
+    .start()
+    .then(() => {
+      startButton.hidden = true
+    })
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error)
+      errorText.textContent = `Microphone access failed: ${message}`
+      errorText.hidden = false
+      statusText.textContent = 'Could not start'
+      startButton.textContent = 'Try again'
+      startButton.disabled = false
+    })
 })
 
 spectrumToggle.addEventListener('change', () => {
