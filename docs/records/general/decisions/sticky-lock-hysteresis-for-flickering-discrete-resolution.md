@@ -1,0 +1,9 @@
+id: sticky-lock-hysteresis-for-flickering-discrete-resolution
+type: pattern
+topic: general
+perspective: the-coder
+created: 1787927000.444039
+---
+
+Pattern: "sticky lock" / hysteresis fix for a live-sensor-driven UI value that flickers between near-adjacent discrete states (e.g. a pitch detector's raw reading occasionally producing a nearby-but-wrong value that flips a "which note/category is this" resolution every frame). Fix belongs at the layer that RESOLVES the raw reading into a discrete choice, not at the raw-detector layer -- add a small stateful lock there: remember the last resolved discrete result (the identity fields only, e.g. {note, targetHz} -- not any live/continuously-varying derived field like a deviation measure), and only re-resolve fully when the new raw reading diverges from the LOCKED result by more than a threshold (a heuristic constant, document it as unverified/tunable rather than asserting it's correct, similar in spirit to other unverified thresholds already in the same codebase for consistency). On every call, still recompute and return the live/continuously-varying derived field fresh against the locked identity -- that's the whole point: identity is sticky, live feedback isn't. Reset the lock whenever any input the resolution logic depends on changes externally (e.g. a config/reference-value setter), since a lock computed under old config is meaningless. This is a pure UX/robustness mitigation at the consuming layer -- it does not fix a noisy/wrong-under-certain-conditions raw detector itself (that's a separate root-cause concern, often explicitly out of scope for a UI-flicker fix).
+When: A live-updating derived-state resolver (frame-by-frame, tick-by-tick) that reads a noisy continuous signal and maps it to a discrete "current thing" the UI displays, where occasional noisy readings cause visible flicker/jumping between discrete states even though the underlying signal hasn't genuinely changed.

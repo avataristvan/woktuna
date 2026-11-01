@@ -1,0 +1,7 @@
+id: chunk_reference_pitch_ui_wiring
+type: learning
+topic: general
+created: 1787925210.976384
+---
+
+Reference-pitch UI wiring chunk complete (commit 4bfec54), directly analogous in scope to Chunk I's UI-wiring work. `ToneFieldApp` interface (bootstrap.ts) gained `setReferencePitchHz(hz: number): void`, delegating straight to `selectScale.setReferencePitchHz(hz)` — no re-render call needed since `tick()` already calls `selectScale.nearestTargetFor()` fresh every frame, reading `referencePitchHz` live, so a mid-session pitch change applies naturally on the next rAF frame. `src/main.ts` UI: a `#reference-pitch-input` number input (min=400, max=480, step=0.1, default 440) with a `#reference-pitch-presets` datalist offering 440/442/443Hz as suggestions (not asserted as THE standard — matches the project's explicit stance that no reference pitch is confirmed correct, only configurable). Validation on 'change': reject/revert to `lastValidReferencePitchHz` (tracked in a closure var, not hardcoded back to 440) if the typed value is non-finite or outside 400-480Hz. `select-scale.ts`'s `UNVERIFIED_DEFAULT_REFERENCE_PITCH_HZ` comment updated to note it's now a user-changeable starting value via this UI, not an unconfigurable placeholder — default value (440) and class behavior untouched. All 129 tests still pass, build/lint/typecheck clean; no new tests added since this is pure UI-wiring (infrastructure/browser + presentation layer, per this repo's testing convention of manual/browser verification only).

@@ -1,0 +1,7 @@
+id: review_findings_chunk_6
+type: learning
+topic: general
+created: 1787922601.908315
+---
+
+Review of Chunk 6 (5396826) found: CRITICAL - fft-peak-picking.ts's `referenceMagnitude <= 0` guard is dead code (Math.hypot over bins is essentially never exactly 0), so when the reference band around the claimed fundamental is pure noise, the 5%-of-reference gate collapses to the noise floor and the detector confidently reports two false-positive partials instead of null -- measured: pure noise input yields octave 431Hz/fifth 674Hz with high confidence. IMPORTANT: the 5%-of-fundamental anchor also causes false negatives on quiet-but-real partials (octave at 4.5% of f0 missed) which contradicts the actual doc-described tuning workflow (tapping an axis specifically to isolate a partial that ISN'T comparable magnitude to the fundamental). IMPORTANT: tolerance-boundary tests (100c/400c) sit ~150 cents away from the real cutoff (~251-260c) so they don't actually constrain DEFAULT_TOLERANCE_CENTS. IMPORTANT: FFT (3ms) + autocorrelation (4.8ms) combined now consume ~50% of the 16.7ms rAF frame budget on desktop -- borderline for real mobile devices, needs profiling; cheap lever if it janks is halving DEFAULT_FFT_SIZE to 16384 (still safe for low-f0 edge case per reviewer, don't go below without rechecking). FFT implementation itself (radix-2, windowing, parabolic interpolation, band-overlap) was verified correct by the reviewer via independent DFT comparison -- not the bug.

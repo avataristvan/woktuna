@@ -1,0 +1,7 @@
+id: chunk-1-scaffold-complete
+type: learning
+topic: general
+created: 1787920402.372533
+---
+
+Chunk 1 (bare scaffold) complete, committed as 25f246a. Vite+TS vanilla-ts template scaffolded via temp-dir-then-move (target dir wasn't empty). Added ESLint flat config (eslint.config.js, typescript-eslint + eslint-config-prettier), Prettier (.prettierrc.json/.prettierignore, semi:false/singleQuote:true), Vitest (config lives inside vite.config.ts via `import { defineConfig } from 'vitest/config'`, jsdom environment), vite-plugin-pwa with placeholder manifest (name/short_name/description/start_url/display=standalone/background_color/theme_color=#1a1a1a/icons: SVG any + 192/512 PNG placeholders generated via ImageMagick from public/icons/icon.svg). devOptions.enabled left at default false per plan policy. index.html has viewport (maximum-scale=1, user-scalable=false) + theme-color meta, title 'WokTuna'. package.json scripts: dev/build/preview/lint/format/test/typecheck all present and verified green. Empty src/app/, src/shared-kernel/, src/capabilities/ created with .gitkeep. One smoke test (src/main.spec.ts) renders main.ts into jsdom #app and asserts 'WokTuna' text — placeholder until real capability code lands. Next chunk (2): mic input + fundamental detection via autocorrelation, per ~/.claude/plans/rippling-hugging-raven.md (local, not in repo).

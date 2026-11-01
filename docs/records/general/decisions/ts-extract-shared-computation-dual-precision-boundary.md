@@ -1,0 +1,8 @@
+id: ts-extract-shared-computation-dual-precision-boundary
+type: pattern
+topic: general
+perspective: the-coder
+created: 1787923515.491747
+---
+
+Pattern: to expose an internally-computed intermediate result (e.g. a spectrum/FFT magnitude array buried inside a peak-search algorithm) as a new public port/capability, without risking the tested algorithm that consumes it: split the pure computation into its own module with TWO exports -- (1) the original low-level function, same signature and numeric type as before (e.g. Float64Array), that the existing algorithm keeps calling unchanged, and (2) a new public-facing wrapper that calls the SAME low-level function and only adds a boundary-appropriate cast/shape (e.g. Float64Array -> Float32Array, plus derived helper closures like bin<->Hz converters) for external consumers. This guarantees the original algorithm's numeric path is byte-for-byte identical post-refactor (verifiable by re-running its existing test suite unchanged), while the new port gets a clean public type without a second FFT/algorithm implementation to maintain. Confirmed the precision-narrowing cast (Float64->Float32) is safe to do only at the new wrapper's boundary when the original algorithm's internal gating thresholds have orders-of-magnitude headroom over float32 precision loss (e.g. a 6x noise-floor margin, 2% ratio floor) -- don't apply this shortcut if the consuming logic does anything precision-sensitive (exact equality, tiny-margin comparisons).

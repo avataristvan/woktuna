@@ -1,0 +1,7 @@
+id: chunk-3-scale-configuration-complete
+type: learning
+topic: general
+created: 1787920660.489876
+---
+
+Chunk 3 (scale-configuration capability) implemented in worktree agent-acc4fad35668b9a12, uncommitted (orchestrator to merge). Files: src/capabilities/scale-configuration/domain/{note.ts,note.spec.ts,scale.ts,nearest-target.ts,nearest-target.spec.ts}, application/select-scale.ts, infrastructure/known-scales.ts. note.ts: NoteName template-literal type (PitchClass + octave number, sharps only, no flat spellings — Bb written as A#), noteToFrequency(note, referencePitchHz) computes semitonesFromA4 via (octave-4)*12 + (pitchClassIndex-9), referencePitchHz always required param, never defaulted inside note.ts itself. nearest-target.ts reimplements centsBetween locally (not imported from tone-field-detection) to keep capabilities decoupled, per plan. select-scale.ts (SelectScale class) holds active Scale + referencePitchHz, defaults referencePitchHz=440 marked with an explicit 'UNVERIFIED PLACEHOLDER, plan Open Item #1' comment. known-scales.ts ships D Kurd / D Amara (Celtic Minor) / C Pygmy note sequences, flagged prominently as PLACEHOLDER/UNVERIFIED (plan Open Item #2) — octave assignments and resulting frequencies both unverified. Verified: npm run typecheck, lint, test (3 files/10 tests) all green from worktree root. git diff --stat against branch point showed zero changes outside src/capabilities/scale-configuration/** — scope discipline held. No import from tone-field-detection or tone-field-visualization anywhere in this capability.

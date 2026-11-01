@@ -1,0 +1,9 @@
+id: dsp-peak-noise-gate-relative-to-known-anchor
+type: pattern
+topic: general
+perspective: the-coder
+created: 1787922178.797815
+---
+
+Rule: When gating a spectral/correlation peak as 'genuine signal vs. noise/leakage' in a search band relative to an already-known anchor frequency (e.g. octave/harmonic search relative to a detected fundamental), don't use a global noise floor (mean/median magnitude across the whole spectrum) as the threshold reference. For a signal made of a handful of strong sinusoids, most of the spectrum is near-exactly zero, so the global floor is tiny -- and a real neighboring peak's window-leakage tail (many bins away, still nonzero) can clear that tiny floor easily, producing a false positive exactly in the case meant to be rejected (a missing/absent partial). Instead, use the *anchor's own* peak magnitude (found via a tight band around the already-known frequency) as the per-call reference, and require a candidate to be both a local maximum within its search band AND at least some fraction (e.g. 5%) of that anchor's magnitude. This works because real co-occurring components of the same physical signal (harmonics/partials of one struck source) tend to share the same order of magnitude, while leakage/noise is many orders weaker relative to any real peak -- an anchor-relative threshold discriminates cleanly where a global floor does not.
+When: FFT/spectral peak-picking for a specific harmonic/partial relative to a known fundamental, or any correlation-peak search where the 'clear peak vs background' decision needs a per-call reference rather than a corpus-wide constant.

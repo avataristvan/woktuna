@@ -1,0 +1,7 @@
+id: review_findings_chunks_2_4
+type: learning
+topic: general
+created: 1787921318.715227
+---
+
+Code review of merged Chunks 2-4 found: CRITICAL - autocorrelation.ts is O(frameLength x lagRange), at DEFAULT_FFT_SIZE=32768 (web-audio-microphone-source.ts) costs ~158ms/frame vs 16.7ms rAF budget (9.4x over budget) -- window length conflates FFT bin resolution with autocorrelation lag resolution, an 8x shorter window (4096) costs only ~0.2 cents accuracy for ~9x throughput. IMPORTANT: no DC-removal/high-pass, low-frequency rumble produces confidently wrong pitches (up to 961 cents off). IMPORTANT: smoothing median window in analyze-tone-field.ts never invalidated on field switch -- reports stale note for ~2 frames after striking a new field. IMPORTANT: canvas-tone-field-renderer.ts's ResizeObserver doesn't catch devicePixelRatio changes from browser zoom/monitor moves (only element resize) -- needs a matchMedia(dppx) listener too. IMPORTANT: deviation-to-guidance.ts silently assumes outside/playing-side hammering, doesn't document the §2.3 inside-hammering inversion assumption. IMPORTANT: no DSP test synthesizes a real multi-partial signal (fundamental+octave+fifth together) -- all tests use pure sines, should lock in behavior before Chunk 6 modifies this code. Minor: NaN not guarded in deviationToGuidance, getBoundingClientRect called every draw() frame (forced reflow), KNOWN_SCALES not readonly/as const.
