@@ -1,7 +1,12 @@
 import { defineConfig } from 'vitest/config'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Public base path. '/' locally; the GitHub Pages workflow sets
+// BASE_PATH=/woktuna/ because the site is served under that sub-path.
+const base = process.env.BASE_PATH ?? '/'
+
 export default defineConfig({
+  base,
   plugins: [
     VitePWA({
       // Service worker must only run in production — a stale dev-mode SW
@@ -9,13 +14,13 @@ export default defineConfig({
       // devOptions.enabled at its default (false).
       registerType: 'autoUpdate',
       manifest: {
-        id: '/',
+        id: base,
         name: 'WokTuna',
         short_name: 'WokTuna',
         description:
           'Handpan tuning guidance — shows where and along which axis to hammer each tone field.',
-        start_url: '/',
-        scope: '/',
+        start_url: base,
+        scope: base,
         display: 'standalone',
         background_color: '#1a1a1a',
         theme_color: '#1a1a1a',
